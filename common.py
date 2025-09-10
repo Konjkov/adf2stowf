@@ -7,12 +7,12 @@
 
 import sys
 try:
-    import numpy
+    import numpy as np
 except ImportError:
     print('This program requires the numpy library, which could not be found.')
     sys.exit()
 
-pi = numpy.pi
+pi = np.pi
 
 F2P_bool={".false.":False,".true.":True}
 P2F_bool={False:".false.",True:".true."}

@@ -7,11 +7,9 @@
 
 import sys
 try:
-    import numpy
+    import numpy as np
 except ImportError:
     sys.exit('This program needs the numpy library, which could not be found.')
-from numpy import *
-from numpy.linalg import inv
 try:
     import adfread
 except ImportError:
@@ -19,7 +17,7 @@ except ImportError:
 
 ############
 
-PLOTCUSPS = False
+PLOTCUSPS = True
 CUSP_ENFORCE = True
 
 ############
@@ -59,20 +57,20 @@ assert all(atyp_idx[Natoms:Natoms+Ndummies] < Natomtypes+Ndummytypes)
 atyp_idx = atyp_idx[:Natoms]
 
 total_charge_per_atomtype = Geometry["atomtype total charge"]
-atomicnumber_per_atomtype = array([ int(c) for c in total_charge_per_atomtype ])
+atomicnumber_per_atomtype = np.array([ int(c) for c in total_charge_per_atomtype ])
 assert all(atomicnumber_per_atomtype[Natomtypes:] == 0)
 
 #####################
 #####################
 
-Nharmpoly_per_shelltype = array([0,1,4,3,5,7])
-Ncartpoly_per_shelltype = array([0,1,0,3,6,10])
+Nharmpoly_per_shelltype = np.array([0,1,4,3,5,7])
+Ncartpoly_per_shelltype = np.array([0,1,0,3,6,10])
 
 harm2cart_per_shelltype = [
-eye(1),# dummy
-eye(1),
-eye(1),# dummy
-eye(3),
+np.eye(1),  # dummy
+np.eye(1),
+np.eye(1),  # dummy
+np.eye(3),
 
 # from stowfdet code:
 #   poly(5)=xy
@@ -80,7 +78,7 @@ eye(3),
 #   poly(7)=zx
 #   poly(8)=(3*zz-r(2)) == 2zz-xx-yy
 #   poly(9)=(xx-yy)
-array([
+np.array([
     [ 0., 0., 0.,-1., 1., +++ 1], #x**2
     [ 1., 0., 0., 0., 0., +++ 0], #x*y
     [ 0., 0., 1., 0., 0., +++ 0], #x*z
@@ -102,7 +100,7 @@ array([
 #    poly(14)=xy*z
 #    poly(15)=xx_yy3*x
 #    poly(16)=xx3_yy*y
-array([
+np.array([
     [ 0.,-1., 0., 0., 0., 1., 0., +++ 1,0,0], #x*x*x
     [ 0., 0.,-1., 0., 0., 0., 3., +++ 0,1,0], #x*x*y
     [-3., 0., 0., 1., 0., 0., 0., +++ 0,0,1], #x*x*z
@@ -116,7 +114,7 @@ array([
 ]),
 ]
 
-cart2harm_per_shelltype = [ inv(m) for m in harm2cart_per_shelltype ]
+cart2harm_per_shelltype = [ np.linalg.inv(m) for m in harm2cart_per_shelltype ]
 
 #####################
 # Valence basis set #
@@ -222,9 +220,9 @@ for at in range(Natomtypes):
     cn = []
     for s in range(Ncore_shells_per_atomtype[at]):
         if core_shelltype_per_atomtype[at][s] == 1:
-            cn += [ array([core_cartnorm_per_atomtype_per_shell[at][s]]) ]
+            cn += [ np.array([core_cartnorm_per_atomtype_per_shell[at][s]]) ]
         elif core_shelltype_per_atomtype[at][s] == 3:
-            cn += [ array([core_cartnorm_per_atomtype_per_shell[at][s]] * 3) ]
+            cn += [ np.array([core_cartnorm_per_atomtype_per_shell[at][s]] * 3) ]
         elif core_shelltype_per_atomtype[at][s] == 4:
             raise ValueError("D type fixed core orbitals not yet implemented")
         elif core_shelltype_per_atomtype[at][s] == 5:
@@ -232,22 +230,22 @@ for at in range(Natomtypes):
         else:
             raise ValueError("unknown shell type")
     if len(cn) > 0:
-        core_cartnorm_per_atomtype += [ concatenate(cn) ]
+        core_cartnorm_per_atomtype += [ np.concatenate(cn) ]
     else:
-        core_cartnorm_per_atomtype += [ zeros([0]) ]
+        core_cartnorm_per_atomtype += [ np.zeros([0]) ]
 
 ############
 ############
 
 Nshells_per_centre = Nvalence_shells_per_centre + Ncore_shells_per_centre
 
-shelltype_per_centre = [ concatenate([core_shelltype_per_atomtype[at],
+shelltype_per_centre = [ np.concatenate([core_shelltype_per_atomtype[at],
                                       valence_shelltype_per_atomtype[at]])
                          for at in atyp_idx ]
-order_r_per_centre = [ concatenate([core_order_r_per_atomtype[at],
+order_r_per_centre = [ np.concatenate([core_order_r_per_atomtype[at],
                                     valence_order_r_per_atomtype[at]])
                        for at in atyp_idx ]
-zeta_per_centre = [ concatenate([core_zeta_per_atomtype[at],
+zeta_per_centre = [ np.concatenate([core_zeta_per_atomtype[at],
                                  valence_zeta_per_atomtype[at]])
                     for at in atyp_idx ]
 
@@ -264,7 +262,7 @@ Nharmbasfns_per_centre = [ Nharmpoly_per_shelltype[st].sum() for st in shelltype
 Nharmbasfns = sum(Nharmbasfns_per_centre)
 
 assert all(Nvalence_cartbasfn_per_centre
-           == array([ Ncartpoly_per_shelltype[st].sum()
+           == np.array([ Ncartpoly_per_shelltype[st].sum()
                       for st in valence_shelltype_per_centre ]))
 Nvalence_cartbasfn = sum(Nvalence_cartbasfn_per_centre)
 
@@ -316,7 +314,7 @@ def select_coeff(sp):
             if occ + 1e-8 >= 2.0/Nspins:
                 valence_molorb_occupation += [ 1 ]
                 occ -= 2.0/Nspins
-                coeff = zeros((Nvalence_cartbasfn,))
+                coeff = np.zeros((Nvalence_cartbasfn,))
                 coeff[npart] = Eigen_Bas_X[o,:]
                 valence_molorb_cart_coeff += [coeff]
             else:
@@ -335,8 +333,8 @@ def select_coeff(sp):
 
     assert sum(valence_molorb_occupation) == Nmolorbs_occup
 
-    valence_molorb_occupation = array(valence_molorb_occupation)
-    valence_molorb_eigenvalue = array(valence_molorb_eigenvalue)
+    valence_molorb_occupation = np.array(valence_molorb_occupation)
+    valence_molorb_eigenvalue = np.array(valence_molorb_eigenvalue)
 
     occupied = (valence_molorb_occupation[:] == 1)
     occidx = valence_molorb_eigenvalue[occupied]
@@ -349,7 +347,7 @@ def select_coeff(sp):
             print("Warning: HOMO > LUMO (may happen in some cases)")
 
     valence_molorb_eigenvalue = valence_molorb_eigenvalue[occupied]
-    valence_molorb_cart_coeff = array(valence_molorb_cart_coeff)
+    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
 
     assert len(valence_molorb_eigenvalue) == Nmolorbs_occup
 
@@ -360,13 +358,13 @@ def select_coeff(sp):
 
 
 valence_molorb_cart_coeff = [ select_coeff(sp) for sp in range(Nspins) ]
-Nvalence_molorbs = numpy.array([ c.shape[0] for c in valence_molorb_cart_coeff ])
+Nvalence_molorbs = np.array([ c.shape[0] for c in valence_molorb_cart_coeff ])
 
 assert sum(Nvalence_molorbs)*(3-Nspins) == Nvalence_electrons
 
 ##############################
 
-cart2harm_matrix = zeros((Nharmbasfns,Nvalence_cartbasfn))
+cart2harm_matrix = np.zeros((Nharmbasfns,Nvalence_cartbasfn))
 cart2harm_constraint = []
 i,j = 0,0
 for c in range(Natoms):
@@ -379,18 +377,18 @@ for c in range(Natoms):
             cart2harm_matrix[i,j] = 1.0
             i+=1;j+=1
         elif st == 3: # P shell
-            cart2harm_matrix[i:i+3,j:j+3] = eye(3)
+            cart2harm_matrix[i:i+3,j:j+3] = np.eye(3)
             i+=3;j+=3
         elif st == 4: # D shell
             cart2harm_matrix[i:i+5,j:j+6] = cart2harm_per_shelltype[st][:5,:]
-            constraint = zeros([1,Nvalence_cartbasfn])
+            constraint = np.zeros([1,Nvalence_cartbasfn])
             constraint[:,j:j+6] = cart2harm_per_shelltype[st][5:,:]
             cart2harm_constraint += [constraint]
             i+=5;j+=6
 
         elif st == 5: # F shell
             cart2harm_matrix[i:i+7,j:j+10] = cart2harm_per_shelltype[st][:7,:]
-            constraint = zeros([3,Nvalence_cartbasfn])
+            constraint = np.zeros([3,Nvalence_cartbasfn])
             constraint[:,j:j+10] = cart2harm_per_shelltype[st][7:,:]
             cart2harm_constraint += [constraint]
             i+=7;j+=10
@@ -399,20 +397,19 @@ assert i == Nharmbasfns
 assert j == Nvalence_cartbasfn
 
 if len(cart2harm_constraint) > 0:
-    cart2harm_constraint = concatenate(cart2harm_constraint,axis=0)
+    cart2harm_constraint = np.concatenate(cart2harm_constraint,axis=0)
 
 valence_molorb_harm_coeff = [
-    zeros((Nharmbasfns,Nvalence_molorbs[sp]))
+    np.zeros((Nharmbasfns,Nvalence_molorbs[sp]))
     for sp in range(Nspins)
 ]
 
 for sp in range(Nspins):
     for m in range(Nvalence_molorbs[sp]):
-        valence_molorb_harm_coeff[sp][:,m] = dot(cart2harm_matrix,
-                                                 valence_molorb_cart_coeff[sp][m,:])
+        valence_molorb_harm_coeff[sp][:,m] = cart2harm_matrix @ valence_molorb_cart_coeff[sp][m,:]
         if len(cart2harm_constraint) > 0:
-            violation = dot(cart2harm_constraint,valence_molorb_cart_coeff[sp][m,:])
-            absviolation = sqrt(sum(abs(violation**2)))
+            violation = cart2harm_constraint @ valence_molorb_cart_coeff[sp][m,:]
+            absviolation = np.sqrt(sum(np.abs(violation**2)))
             if absviolation > 1e-5:
                 print("WARNING: cartesian to harmonic conversion: spin #%i, orb #%i "
                       "violated by %g"%(sp,m,absviolation))
@@ -426,15 +423,15 @@ nrcorb = Core["nrcorb"].reshape(Natomtypes,4)
 ccor = Core["ccor"]
 Nccor_per_atomtype = (nrcset*nrcorb).sum(axis=1)
 assert len(ccor) == Nccor_per_atomtype.sum()
-ccor_per_atomtype = array_split(ccor,cumsum(Nccor_per_atomtype))[:-1]
+ccor_per_atomtype = np.array_split(ccor,np.cumsum(Nccor_per_atomtype))[:-1]
 
-Ncoremolorbs_per_atomtype = (nrcorb*array([1,3,5,7])[None,:]).sum(axis=1)
+Ncoremolorbs_per_atomtype = (nrcorb*np.array([1,3,5,7])[None,:]).sum(axis=1)
 Ncoremolorbs_per_centre = Ncoremolorbs_per_atomtype[atyp_idx]
 
 
 Ncore_molorbs = Ncoremolorbs_per_centre.sum()
 
-core_molorb_coeff = zeros((Nharmbasfns,Ncore_molorbs))
+core_molorb_coeff = np.zeros((Nharmbasfns,Ncore_molorbs))
 
 molorb = 0
 
@@ -443,8 +440,8 @@ for a in range(Natoms):
     first_harmbasfn = sum(Nharmbasfns_per_centre[:a])
     Ncore_harmbasfns = sum(Nharmpoly_per_shelltype[st].sum()
                            for st in core_shelltype_per_atomtype[at])
-    core_coeff = zeros([Ncore_harmbasfns])
-    ccor_per_shell = array_split(ccor_per_atomtype[at],cumsum((nrcset*nrcorb)[at,:]))[:-1]
+    core_coeff = np.zeros([Ncore_harmbasfns])
+    ccor_per_shell = np.array_split(ccor_per_atomtype[at],np.cumsum((nrcset*nrcorb)[at,:]))[:-1]
 
     for shell in range(nrcorb[at,0]): # S core shells
         core_coeff[:] = 0.0
@@ -482,9 +479,9 @@ assert molorb == Ncore_molorbs
 ############
 ############
 
-Nmolorbs = numpy.array([ Ncore_molorbs + Nvalence_molorbs[sp] for sp in range(Nspins) ])
+Nmolorbs = np.array([ Ncore_molorbs + Nvalence_molorbs[sp] for sp in range(Nspins) ])
 coeff = [
-    concatenate([core_molorb_coeff,valence_molorb_harm_coeff[sp]],axis=1)
+    np.concatenate([core_molorb_coeff,valence_molorb_harm_coeff[sp]],axis=1)
     for sp in range(Nspins)
 ]
 
@@ -492,17 +489,17 @@ if False:
     print("molorb sparsity:")
     for sp in range(Nspins):
         for i in range(Nmolorbs[sp]):
-            print("".join(array([".","X"])[(coeff[sp][:,i] != 0.0)*1]))
+            print("".join(np.array([".","X"])[(coeff[sp][:,i] != 0.0)*1]))
 
 
 ############
 ############
 
-norm_per_centre = [ concatenate([core_cartnorm_per_atomtype[at],
+norm_per_centre = [ np.concatenate([core_cartnorm_per_atomtype[at],
                                  valence_cartnorm_per_atomtype[at]])
                     for at in atyp_idx ]
 
-norm_per_harmbasfn = concatenate(norm_per_centre)
+norm_per_harmbasfn = np.concatenate(norm_per_centre)
 #print(norm_per_centre)
 #print(Nharmbasfns)
 #assert len(norm_per_harmbasfn) == Nharmbasfns
@@ -549,11 +546,11 @@ sto.num_centres = int(Natoms)
 sto.centrepos = Geometry["xyz"].reshape(Natoms+Ndummies,3)[:Natoms,:]
 sto.num_shells = sum(Nshells_per_centre)
 
-sto.idx_first_shell_on_centre = array([0] + list(cumsum(Nshells_per_centre)))
+sto.idx_first_shell_on_centre = np.array([0] + list(np.cumsum(Nshells_per_centre)))
 
-sto.shelltype = concatenate(shelltype_per_centre)
-sto.order_r_in_shell = concatenate(order_r_per_centre)
-sto.zeta = concatenate(zeta_per_centre)
+sto.shelltype = np.concatenate(shelltype_per_centre)
+sto.order_r_in_shell = np.concatenate(order_r_per_centre)
+sto.zeta = np.concatenate(zeta_per_centre)
 
 sto.num_atorbs = Nharmbasfns
 sto.num_molorbs = Nmolorbs
@@ -571,9 +568,9 @@ if False:
     print(sto.get_norm())
 #print(norm_per_harmbasfn - sto.get_norm())
 
-numpy.set_printoptions(suppress=True)
+np.set_printoptions(suppress=True)
 
-#assert all(abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+#assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 cusp_fixed_atorbs = sto.cusp_fixed_atorbs()
 cusp_constraint = sto.cusp_constraint_matrix()
@@ -585,31 +582,31 @@ cusp_enforcing = sto.cusp_enforcing_matrix()
 print("Molorb values at nuclei before applying cusp constraint:")
 print(sto.eval_molorbs(sto.atompos.transpose()))
 
-fixed = [ zeros(Nmolorbs[sp],bool) for sp in range(Nspins) ]
+fixed = [ np.zeros(Nmolorbs[sp],bool) for sp in range(Nspins) ]
 
 for sp in range(Nspins):
     for i in range(Nmolorbs[sp]):
-        constraint_violation = dot(cusp_constraint,coeff[sp][:,i])
-        if any(abs(constraint_violation) > 1e-9):
+        constraint_violation = cusp_constraint @ coeff[sp][:,i]
+        if np.any(np.abs(constraint_violation) > 1e-9):
             fixed[sp][i] = True
             print("spin #%i, orb #%i - constraint violation by:"%(sp,i),constraint_violation)
             if CUSP_ENFORCE:
                 print("    original coefficients:    ",coeff[sp][cusp_fixed_atorbs,i])
-        #    projected_coeff = dot(cusp_projection.A,coeff[:,i])
+        #    projected_coeff = cusp_projection.A @ coeff[:,i]
         #    print("    proj coeff:",projected_coeff)
-        #    print("    after projection       :",dot(cusp_constraint,projected_coeff))
+        #    print("    after projection       :", cusp_constraint @ projected_coeff)
 
-                enforced_coeff = dot(cusp_enforcing.A,coeff[sp][:,i])
+                enforced_coeff = cusp_enforcing.A @ coeff[sp][:,i]
                 print("    constrained coefficients: ",enforced_coeff[cusp_fixed_atorbs])
                 coeff[sp][:,i] = enforced_coeff
 
-                constraint_violation = dot(cusp_constraint,coeff[sp][:,i])
-                assert all(abs(constraint_violation) < 1e-8)
-        #    print("    after enforcing        :",dot(cusp_constraint,enforced_coeff))
+                constraint_violation = cusp_constraint @ coeff[sp][:,i]
+                assert np.all(np.abs(constraint_violation) < 1e-8)
+        #    print("    after enforcing        :", cusp_constraint @ enforced_coeff)
 
 if PLOTCUSPS:
-    z = linspace(-.5,.5,501)
-    r = [ numpy.zeros((3,len(z))) + sto.atompos[at,:][:,None] for at in range(sto.num_atom) ]
+    z = np.linspace(-.5,.5,501)
+    r = [ np.zeros((3,len(z))) + sto.atompos[at,:][:,None] for at in range(sto.num_atom) ]
     for ir in r: ir[2,:] += z
     print(fixed)
     val_pre = [ [ sto.eval_molorbs(ir,spin=sp)[:,fixed[sp]] for sp in range(Nspins) ] for ir in r ]
@@ -627,7 +624,7 @@ if PLOTCUSPS:
 if CUSP_ENFORCE:
     print("Molorb values at nuclei after applying cusp constraint:")
     print(sto.eval_molorbs(sto.atompos.transpose()))
-    #assert all(abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+    #assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 sto.writefile("stowfn.data")
 
@@ -648,13 +645,13 @@ if PLOTCUSPS:
             for i in range(sum(fixed[sp])):
                 vpre = val_pre[at][sp][:,i]
                 vpost = val_post[at][sp][:,i]
-                sgn = sign(vpre[len(vpre)//2])
+                sgn = np.sign(vpre[len(vpre)//2])
                 print(at,sp,i)
                 pl, = axval[at].plot(z,sgn*vpre,'--')
                 axval[at].plot(z,sgn*vpost,color=pl.get_color())
             #      pl, = axeloc[at].plot(z,lap_pre[at][sp][:,i]+sto.atomnum[at]/z,'--')
-                eloc_pre = -0.5*lap_pre[at][sp][:,i]/val_pre[at][sp][:,i]-sto.atomnum[at]/abs(z)
-                eloc_post = -0.5*lap_post[at][sp][:,i]/val_post[at][sp][:,i]-sto.atomnum[at]/abs(z)
+                eloc_pre = -0.5*lap_pre[at][sp][:,i]/val_pre[at][sp][:,i]-sto.atomnum[at]/np.abs(z)
+                eloc_post = -0.5*lap_post[at][sp][:,i]/val_post[at][sp][:,i]-sto.atomnum[at]/np.abs(z)
                 axeloc[at].plot(z,eloc_pre,'--',color=pl.get_color())
                 axeloc[at].plot(z,eloc_post,'-',color=pl.get_color())
                 eloc_min = min(eloc_min,eloc_post[0],eloc_post[-1],

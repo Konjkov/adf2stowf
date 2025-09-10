@@ -8,7 +8,7 @@
 
 from common import *
 
-num_orbs_per_shelltype=numpy.array([0,1,4,3,5,7,9])
+num_orbs_per_shelltype=np.array([0,1,4,3,5,7,9])
 
 
 support_code = r"""
@@ -334,13 +334,13 @@ class stowfn:
                 l = readline()
                 res += [ float(l[i:i+20]) for i in range(0,len(l)-1,20) ]
             assert len(res) == N
-            return numpy.array(res)
+            return np.array(res)
         def readints(N):
             res = []
             while len(res) < N:
                 res += [ int(n) for n in readline().split() ]
             assert len(res) == N
-            return numpy.array(res)
+            return np.array(res)
         def readbool():
             return F2P_bool[readstr()]
         def skipline(text=""):
@@ -382,7 +382,7 @@ class stowfn:
         skipline("Number of shells")
         self.num_shells = readint()
         skipline("Sequence number of first shell on each centre")
-        self.idx_first_shell_on_centre = numpy.array(list(readints(self.num_centres) - 1) + [self.num_shells])
+        self.idx_first_shell_on_centre = np.array(list(readints(self.num_centres) - 1) + [self.num_shells])
         skipline("Code for shell types (s/sp/p/d/f/g 1/2/3/4/5/6)")
         self.shelltype = readints(self.num_shells)
         skipline("Order of radial prefactor r in each shell")
@@ -399,12 +399,12 @@ class stowfn:
         assert self.idx_first_shell_on_centre[0] == 0
 
         self.num_shells_on_centre = self.idx_first_shell_on_centre[1:] - self.idx_first_shell_on_centre[:-1]
-        self.max_order_r_on_centre = numpy.array([
+        self.max_order_r_on_centre = np.array([
             max(2,self.order_r_in_shell[self.idx_first_shell_on_centre[i]:self.idx_first_shell_on_centre[i+1]].max())
             for i in range(self.num_centres)
         ])
         self.max_order_r = self.max_order_r_on_centre.max()
-        self.max_shell_type_on_centre = numpy.array([
+        self.max_shell_type_on_centre = np.array([
             self.shelltype[self.idx_first_shell_on_centre[i]:self.idx_first_shell_on_centre[i+1]].max()
             for i in range(self.num_centres)
         ])
@@ -426,9 +426,9 @@ class stowfn:
             skipline()
             self.footer = f.readlines()
         else:
-            self.coeff = [ numpy.zeros((self.num_molorbs[0],self.num_atorbs)) ]
+            self.coeff = [ np.zeros((self.num_molorbs[0],self.num_atorbs)) ]
             if self.spin_unrestricted:
-                self.coeff += [ numpy.zeros((self.num_molorbs[1],self.num_atorbs)) ]
+                self.coeff += [ np.zeros((self.num_molorbs[1],self.num_atorbs)) ]
             self.coeff_norm = [ c[:,:]*0.0 for c in self.coeff ]
             self.footer = [line] + f.readlines()
         f.close()
@@ -442,23 +442,23 @@ class stowfn:
         self.num_elec = int(self.num_elec)
         self.num_atom = int(self.num_atom)
         assert self.atompos.shape == (self.num_atom,3)
-        assert numpy.issubdtype(self.atompos.dtype,float)
+        assert np.issubdtype(self.atompos.dtype,float)
         assert self.atomnum.shape == (self.num_atom,)
-        assert numpy.issubdtype(self.atomnum.dtype,int)
+        assert np.issubdtype(self.atomnum.dtype,int)
         assert self.atomcharge.shape == (self.num_atom,)
-        assert numpy.issubdtype(self.atomcharge.dtype,float)
+        assert np.issubdtype(self.atomcharge.dtype,float)
         self.num_centres = int(self.num_centres)
         assert self.centrepos.shape == (self.num_centres,3)
-        assert numpy.issubdtype(self.centrepos.dtype,float)
+        assert np.issubdtype(self.centrepos.dtype,float)
         self.num_shells = int(self.num_shells)
         assert self.idx_first_shell_on_centre.shape == (self.num_centres+1,)
-        assert numpy.issubdtype(self.idx_first_shell_on_centre.dtype,int)
+        assert np.issubdtype(self.idx_first_shell_on_centre.dtype,int)
         assert self.shelltype.shape == (self.num_shells,)
-        assert numpy.issubdtype(self.shelltype.dtype,int)
+        assert np.issubdtype(self.shelltype.dtype,int)
         assert self.order_r_in_shell.shape == (self.num_shells,)
-        assert numpy.issubdtype(self.order_r_in_shell.dtype,int)
+        assert np.issubdtype(self.order_r_in_shell.dtype,int)
         assert self.zeta.shape == (self.num_shells,)
-        assert numpy.issubdtype(self.zeta.dtype,float)
+        assert np.issubdtype(self.zeta.dtype,float)
         self.num_atorbs = int(self.num_atorbs)
         assert self.num_molorbs.shape == (1+self.spin_unrestricted,)
 
@@ -466,12 +466,12 @@ class stowfn:
         assert self.idx_first_shell_on_centre[0] == 0
 
         self.num_shells_on_centre = self.idx_first_shell_on_centre[1:] - self.idx_first_shell_on_centre[:-1]
-        self.max_order_r_on_centre = numpy.array([
+        self.max_order_r_on_centre = np.array([
             max(2,self.order_r_in_shell[self.idx_first_shell_on_centre[i]:self.idx_first_shell_on_centre[i+1]].max())
             for i in range(self.num_centres)
         ])
         self.max_order_r = self.max_order_r_on_centre.max()
-        self.max_shell_type_on_centre = numpy.array([
+        self.max_shell_type_on_centre = np.array([
             self.shelltype[self.idx_first_shell_on_centre[i]:self.idx_first_shell_on_centre[i+1]].max()
             for i in range(self.num_centres)
         ])
@@ -482,7 +482,7 @@ class stowfn:
         assert len(self.coeff) == self.num_spins
         for sp in range(self.num_spins):
             assert self.coeff[sp].shape == (self.num_molorbs[sp],self.num_atorbs)
-            assert self.coeff[sp].dtype == numpy.float64
+            assert self.coeff[sp].dtype == np.float64
         self.coeff_norm = [
             self.coeff[sp][:,:] * self.get_norm()[None,:]
             for sp in range(self.num_spins)
@@ -607,7 +607,7 @@ class stowfn:
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
         num_molorbs = self.num_molorbs[spin]
-        val = numpy.zeros((num_points,num_molorbs))
+        val = np.zeros((num_points,num_molorbs))
         coeff_norm = self.coeff_norm[spin]
         dict = mapunion(self.__dict__,locals())
         weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS"])
@@ -617,9 +617,9 @@ class stowfn:
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
         num_molorbs = self.num_molorbs[spin]
-        val = numpy.zeros((num_points,num_molorbs))
-        grad = numpy.zeros((3,num_points,num_molorbs))
-        lap = numpy.zeros((num_points,num_molorbs))
+        val = np.zeros((num_points,num_molorbs))
+        grad = np.zeros((3,num_points,num_molorbs))
+        lap = np.zeros((num_points,num_molorbs))
         coeff_norm = self.coeff_norm[spin]
         dict = mapunion(self.__dict__,locals())
         weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS","CALC_DERIVS"])
@@ -628,13 +628,13 @@ class stowfn:
     def eval_atorbs(self,pos):
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
-        atorbs = numpy.zeros((num_points,self.num_atorbs))
+        atorbs = np.zeros((num_points,self.num_atorbs))
         dict = mapunion(self.__dict__,locals())
         weave_inline(support_code,eval_code,dict,["EVAL_ATORBS"])
         return atorbs
 
     def get_norm(self):
-        norm = numpy.zeros((self.num_atorbs,))
+        norm = np.zeros((self.num_atorbs,))
         dict = mapunion(self.__dict__,locals())
         weave_inline(support_code,norm_code,dict)
         return norm
@@ -651,7 +651,7 @@ class stowfn:
 
     def cusp_constraint_matrix(self):
         norm = self.get_norm()
-        res = numpy.asmatrix(numpy.zeros((self.num_centres,self.num_atorbs)))
+        res = np.asmatrix(np.zeros((self.num_centres,self.num_atorbs)))
         for core in range(self.num_centres):
             atorb_vals = self.eval_atorbs(self.centrepos[core][:,None])[0,:]
             for (atorb,centre,nshell,N,_pl) in self.iter_atorbs():
@@ -667,21 +667,21 @@ class stowfn:
 
     def cusp_projection_matrix(self):
         #print "cusp_constraint: ",cusp_constraint
-        _U,_S,Vh = numpy.linalg.svd(self.cusp_constraint_matrix(),full_matrices=False)
+        _U,_S,Vh = np.linalg.svd(self.cusp_constraint_matrix(),full_matrices=False)
         #print "shapes U,S,Vh",U.shape,S.shape,Vh.shape
         P = Vh.T * Vh
         #print "proj shape",cusp_constraint_projector.shape
         #print "proj trace",P.trace()
-        #print "proj squarediff",numpy.linalg.norm(P - P*P)
-        Q = numpy.eye(P.shape[0]) - P
+        #print "proj squarediff",np.linalg.norm(P - P*P)
+        Q = np.eye(P.shape[0]) - P
         return Q
 
     def cusp_fixed_atorbs(self):
-        res = numpy.zeros(self.num_centres,int)
+        res = np.zeros(self.num_centres,int)
         for c in range(self.num_centres):
-            cidx = numpy.zeros(self.num_shells)
+            cidx = np.zeros(self.num_shells)
             cidx[self.idx_first_shell_on_centre[c]:self.idx_first_shell_on_centre[c+1]] = 1.0
-            shell = numpy.argmax(self.zeta * cidx * (self.shelltype == 1))
+            shell = np.argmax(self.zeta * cidx * (self.shelltype == 1))
             res[c] = num_orbs_per_shelltype[self.shelltype[:shell]].sum()
         return res
 
@@ -690,10 +690,10 @@ class stowfn:
         constraint = self.cusp_constraint_matrix()
         res = constraint + 0.0
         res[:,cusp_fixed_atorb] = 0.0
-        U,S,Vh = numpy.linalg.svd(constraint[:,cusp_fixed_atorb],full_matrices=False)
-        tmpinv = Vh.T * numpy.asmatrix(numpy.diag(1/S)) * U.T
+        U,S,Vh = np.linalg.svd(constraint[:,cusp_fixed_atorb],full_matrices=False)
+        tmpinv = Vh.T * np.asmatrix(np.diag(1/S)) * U.T
         res = -tmpinv * res
-        mat = numpy.asmatrix(numpy.eye(self.num_atorbs))
+        mat = np.asmatrix(np.eye(self.num_atorbs))
         mat[cusp_fixed_atorb,:] = res
         return mat
 
@@ -701,7 +701,7 @@ class stowfn:
 if __name__ == "__main__":
     sto = stowfn("stowfn.data")
     sto.read_molorbmods("correlation.data")
-    points = numpy.zeros((3,4))
+    points = np.zeros((3,4))
     points[:,0] = (-0.19450689,-0.94412413,-0.67370571)
     points[:,:] = points[:,:1]
     points[0,1] += 0.00317100
