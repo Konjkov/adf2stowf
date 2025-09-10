@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# coding: utf8
+#!/usr/bin/env python3.9
 
 # (C) 2008 Norbert Nemec
 # This file is part of the CASINO distribution.
@@ -40,18 +39,18 @@ def cyl_integral(f,phi,rho,z):
 
 def weave_inline(support_code,code,dict,defs=[]):
     try:
-        import scipy.weave
+        import weave
     except ImportError:
         print('This program requires the scipy library, which could not be')
         print('found.')
         sys.exit()
-    scipy.weave.inline(
+    weave.inline(
         headers = ["<cstdlib>","<cmath>"],
         support_code = "\n".join(["#define "+d for d in defs] + [support_code]),
         code = "\n".join(["// #define "+d for d in defs] + [code]),
         arg_names = dict.keys(),
         local_dict = dict,
-        type_converters = scipy.weave.converters.blitz,
+        type_converters = weave.converters.blitz,
         compiler = 'gcc',
         extra_compile_args = ["-Wno-all"],
         verbose = 1,

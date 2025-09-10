@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.9
 
 # (C) 2008 Norbert Nemec
 # This file is part of the CASINO distribution.
@@ -30,7 +30,7 @@ def intX(s):
 def adfread(infname="TAPE21.asc",outfile=None):
 
     try:
-        lines = open(infname,encoding='ascii').readlines()
+        lines = open(infname,encoding='latin-1').readlines()
     except(FileNotFoundError,IsADirectoryError):
         print('File '+infname+' could not be read.')
         sys.exit()
@@ -50,7 +50,7 @@ def adfread(infname="TAPE21.asc",outfile=None):
             if typ == 1: # integer
                 value = []
                 while len(value) < len2:
-                    value += [ intX(s) for s in splitN(lines[i][:-1],10) ] ; i += 1
+                    value += [ intX(s) for s in splitN(lines[i][:-1],12) ] ; i += 1
                 assert len(value) == len2
                 value = numpy.array(value,int)
             elif typ == 2: # float
@@ -64,7 +64,7 @@ def adfread(infname="TAPE21.asc",outfile=None):
                 while len(value) < len2:
                     value += lines[i][:-1] ; i += 1
                 assert len(value) == len2
-                value = [ value[160*j:160*(j+1)].strip() for j in range((len(value)+159)/160) ]
+                value = [ value[160*j:160*(j+1)].strip() for j in range((len(value)+159)//160) ]
             elif typ == 4: # bool
                 value = []
                 while len(value) < len2:
@@ -109,4 +109,4 @@ if __name__=="__main__":
     ascfname = sys.argv[1]
     assert ascfname[-4:] == ".asc"
 #    numpy.set_printoptions(threshold=10)
-    data = adfread(infname=ascfname,outfile=open(ascfname[:-4]+".out","w",encoding='ascii'))
+    data = adfread(infname=ascfname,outfile=open(ascfname[:-4]+".out","w",encoding='latin-1'))

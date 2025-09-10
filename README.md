@@ -15,12 +15,12 @@ Requirements
 ============
 
 The script has been verified to work with:
-    Python 3.12.3
+    Python 3.9.23
     NumPy 1.26.4
-    SciPy 1.11.4
+    scipy-weave 0.19.0
 
 For optional plotting of the cusp constraints
-    Matplotlib 3.6.3
+    Matplotlib 3.9.4
 
 
 Usage
