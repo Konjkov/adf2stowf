@@ -7,8 +7,7 @@
 
 
 from common import *
-import stowfn_norm
-import stowfn_atorbs
+import stowfn_cpp
 
 num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 
@@ -569,7 +568,7 @@ class stowfn:
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
         atorbs = np.zeros((num_points,self.num_atorbs))
-        stowfn_atorbs.eval_atorbs(
+        stowfn_cpp.eval_atorbs(
             pos.astype(float),  # (3,num_points)
             self.centrepos.astype(float),  # (num_centres,3)
             np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
@@ -584,7 +583,7 @@ class stowfn:
 
     def get_norm(self):
         norm = np.zeros((self.num_atorbs,))
-        stowfn_norm.compute_norm(
+        stowfn_cpp.compute_norm(
             np.array(self.num_shells_on_centre, dtype=np.int32),
             np.array(self.shelltype, dtype=np.int32),
             np.array(self.order_r_in_shell, dtype=np.int32),
