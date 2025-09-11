@@ -22,7 +22,7 @@ inline double factorial_int(int N) {
     return res;
 }
 
-void compute_norm_arr(
+void compute_norm(
     py::array_t<int, py::array::c_style | py::array::forcecast> num_shells_on_centre,
     py::array_t<int, py::array::c_style | py::array::forcecast> shelltype,
     py::array_t<int, py::array::c_style | py::array::forcecast> order_r_in_shell,
@@ -97,7 +97,7 @@ void compute_norm_arr(
 
 PYBIND11_MODULE(stowfn_norm, m) {
     m.doc() = "Compute orbital normalization (array interface)";
-    m.def("compute_norm_arr", &compute_norm_arr,
+    m.def("compute_norm", &compute_norm,
           py::arg("num_shells_on_centre"),
           py::arg("shelltype"),
           py::arg("order_r_in_shell"),

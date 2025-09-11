@@ -7,7 +7,7 @@
 
 
 from common import *
-from stowfn_norm import compute_norm_arr
+import stowfn_norm
 
 num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 
@@ -588,7 +588,7 @@ class stowfn:
 
     def get_norm(self):
         norm = np.zeros((self.num_atorbs,))
-        compute_norm_arr(
+        stowfn_norm.compute_norm(
             np.array(self.num_shells_on_centre, dtype=np.int32),
             np.array(self.shelltype, dtype=np.int32),
             np.array(self.order_r_in_shell, dtype=np.int32),

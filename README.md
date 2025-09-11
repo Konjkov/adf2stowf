@@ -32,7 +32,7 @@ Build instructions
 Then build the extension in place:
 
     cd path/to/adf2stowf
-    python3 setup.py build_ext --inplace
+    python3.9 setup.py build_ext --inplace
 
 This will create a shared library file, for example:
 
