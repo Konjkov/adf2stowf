@@ -16,7 +16,7 @@ static const int polypow[25] = {
     4,4,4,4,4,4,4,4,4
 };
 
-inline double factorial_int(int N) {
+inline double factorial(int N) {
     double res = 1.0;
     for (int i = 2; i <= N; ++i) res *= i;
     return res;
@@ -83,7 +83,7 @@ void compute_norm(
                 double z    = buf_zeta(n_shell);
 
                 int n = polypow[pl] + order_r + 1;
-                double val = polynorm[pl] * std::pow(2.0*z, n) * std::sqrt(2.0*z / factorial_int(2*n));
+                double val = polynorm[pl] * std::pow(2.0*z, n) * std::sqrt(2.0*z / factorial(2*n));
 
                 if (n_atorb < buf_norm.shape(0)) {
                     buf_norm(n_atorb) = val;

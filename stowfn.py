@@ -8,6 +8,7 @@
 
 from common import *
 import stowfn_norm
+import stowfn_atorbs
 
 num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 
@@ -17,20 +18,6 @@ support_code = r"""
 const double sto_exp_cutoff = 746.0;
 const int num_poly_in_shell_type[] = { 0, 1, 4, 3, 5, 7, 9 };
 const int first_poly_in_shell_type[] = { 0, 0, 0, 1, 4, 9, 16 };
-const double pi = 3.14159265358979323846;
-
-const int polypow[25] = {
-    0,
-    1,1,1,
-    2,2,2,2,2,
-    3,3,3,3,3,3,3,
-    4,4,4,4,4,4,4,4,4
-};
-
-double factorial(int N) {
-    if(N<=1) return 1.0;
-    else     return N*factorial(N-1);
-}
 
 template <typename T>
 inline blitz::Array<T,1> vec(const T a1,const T a2,const T a3)
@@ -578,12 +565,21 @@ class stowfn:
         weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS","CALC_DERIVS"])
         return val, grad, lap
 
-    def eval_atorbs(self,pos):
+    def eval_atorbs(self, pos):
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
         atorbs = np.zeros((num_points,self.num_atorbs))
-        dict = mapunion(self.__dict__,locals())
-        weave_inline(support_code,eval_code,dict,["EVAL_ATORBS"])
+        stowfn_atorbs.eval_atorbs(
+            pos.astype(float),  # (3,num_points)
+            self.centrepos.astype(float),  # (num_centres,3)
+            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.max_order_r_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
+            atorbs  # output
+        )
         return atorbs
 
     def get_norm(self):

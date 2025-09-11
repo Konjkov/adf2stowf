@@ -7,11 +7,11 @@ ext_modules = [
         ["stowfn_norm.cpp"],
         extra_compile_args=["-O3"],
     ),
-#    Pybind11Extension(
-#        "stowfn_eval",
-#        ["stowfn_eval.cpp"],
-#        extra_compile_args=["-O3"],
-#    ),
+    Pybind11Extension(
+        "stowfn_atorbs",
+        ["stowfn_atorbs.cpp"],
+        extra_compile_args=["-O3"],
+    ),
 ]
 
 setup(
