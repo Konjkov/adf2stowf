@@ -260,54 +260,6 @@ for(int pt=0;pt<num_points;pt++) {
 """
 
 
-norm_code = r"""
-#line """+'%i'%(lineno()+1)+r""" "stowfn.py"
-int n_shell=0;
-int n_atorb=0;
-double polynorm[25];
-
-polynorm[0] = sqrt(1./(4.*pi)); // 1
-polynorm[1] = sqrt(3./(4.*pi)); // x
-polynorm[2] = sqrt(3./(4.*pi)); // y
-polynorm[3] = sqrt(3./(4.*pi)); // z
-
-polynorm[4] = .5*sqrt(15./pi); // xy
-polynorm[5] = .5*sqrt(15./pi); // yz
-polynorm[6] = .5*sqrt(15./pi); // zx
-polynorm[7] = .25*sqrt(5./pi); // 3*zz-r(2);
-polynorm[8] = .25*sqrt(15./pi); // xx-yy;
-
-polynorm[ 9] = .25*sqrt(7./pi); // (2*zz-3*(xx+yy))*z;
-polynorm[10] = .25*sqrt(10.5/pi); // (4*zz-(xx+yy))*x;
-polynorm[11] = .25*sqrt(10.5/pi); // (4*zz-(xx+yy))*y;
-polynorm[12] = .25*sqrt(105./pi); // (xx-yy)*z;
-polynorm[13] = .5*sqrt(105./pi); // xy*z;
-polynorm[14] = .25*sqrt(17.5/pi); // (xx-3.0*yy)*x;
-polynorm[15] = .25*sqrt(17.5/pi); // (3.0*xx-yy)*y;
-
-polynorm[16] = .1875*sqrt(1./pi); // 35zzzz-30zzrr+3rrrr
-polynorm[17] = .75*sqrt(2.5/pi); // xz(7zz-3rr)
-polynorm[18] = .75*sqrt(2.5/pi); // yz(7zz-3rr)
-polynorm[19] = .375*sqrt(5./pi); // (xx-yy)(7zz-rr)
-polynorm[20] = .75*sqrt(5./pi); // xy(7zz-rr)
-polynorm[21] = .75*sqrt(17.5/pi); // xz(xx-3yy)
-polynorm[22] = .75*sqrt(17.5/pi); // yz(3xx-yy)
-polynorm[23] = .1875*sqrt(35./pi); // xxxx-6xxyy+yyyy
-polynorm[24] = .75*sqrt(35./pi); // xxxy-xyyy
-
-for(int centre=0; centre<num_centres;centre++) {
-    for(int shell=0; shell<num_shells_on_centre(centre); shell++,n_shell++) {
-        for(int pl=first_poly_in_shell_type[shelltype(n_shell)];
-            pl < first_poly_in_shell_type[shelltype(n_shell)]+num_poly_in_shell_type[shelltype(n_shell)];
-            pl++, n_atorb++) {
-            int n = polypow[pl] + order_r_in_shell(n_shell) + 1;
-            norm(n_atorb)=polynorm[pl] * pow(2*zeta(n_shell),n) * sqrt(2*zeta(n_shell)/factorial(2*n));
-        } // pl
-    } // shell
-} // centre
-"""
-
-
 class stowfn:
     def __init__(self,fname=None):
         if fname is not None:
@@ -644,9 +596,6 @@ class stowfn:
             norm,
         )
         return norm
-        # dict = mapunion(self.__dict__, locals())
-        # weave_inline(support_code, norm_code, dict)
-        # return norm
 
     def iter_atorbs(self):
         nshell = 0

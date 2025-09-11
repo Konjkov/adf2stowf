@@ -70,15 +70,15 @@ void compute_norm_arr(
     int n_shell = 0;
     int n_atorb = 0;
 
-    for (ssize_t centre = 0; centre < buf_num_shells.shape(0); ++centre) {
+    for (int centre = 0; centre < buf_num_shells.shape(0); centre++) {
         int shells_on_centre = buf_num_shells(centre);
 
-        for (int shell = 0; shell < shells_on_centre; ++shell, ++n_shell) {
+        for (int shell = 0; shell < shells_on_centre; shell++, n_shell++) {
             int sh_type = buf_shelltype(n_shell);
             int first_pl = first_poly_in_shell_type[sh_type];
             int num_pl   = num_poly_in_shell_type[sh_type];
 
-            for (int pl = first_pl; pl < first_pl + num_pl; ++pl, ++n_atorb) {
+            for (int pl = first_pl; pl < first_pl + num_pl; pl++, n_atorb++) {
                 int order_r = buf_order_r(n_shell);
                 double z    = buf_zeta(n_shell);
 
@@ -90,9 +90,9 @@ void compute_norm_arr(
                 } else {
                     throw std::runtime_error("norm array too small for number of orbitals");
                 }
-            }
-        }
-    }
+            } // pl
+        } // shell
+    } // centre
 }
 
 PYBIND11_MODULE(stowfn_norm, m) {
