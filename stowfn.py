@@ -7,8 +7,9 @@
 
 
 from common import *
+from stowfn_norm import compute_norm_arr
 
-num_orbs_per_shelltype=np.array([0,1,4,3,5,7,9])
+num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 
 
 support_code = r"""
@@ -623,7 +624,7 @@ class stowfn:
         coeff_norm = self.coeff_norm[spin]
         dict = mapunion(self.__dict__,locals())
         weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS","CALC_DERIVS"])
-        return val,grad,lap
+        return val, grad, lap
 
     def eval_atorbs(self,pos):
         num_points = pos.shape[1]
@@ -635,9 +636,17 @@ class stowfn:
 
     def get_norm(self):
         norm = np.zeros((self.num_atorbs,))
-        dict = mapunion(self.__dict__,locals())
-        weave_inline(support_code,norm_code,dict)
+        compute_norm_arr(
+            np.array(self.num_shells_on_centre, dtype=np.int32),
+            np.array(self.shelltype, dtype=np.int32),
+            np.array(self.order_r_in_shell, dtype=np.int32),
+            np.array(self.zeta, dtype=float),
+            norm,
+        )
         return norm
+        # dict = mapunion(self.__dict__, locals())
+        # weave_inline(support_code, norm_code, dict)
+        # return norm
 
     def iter_atorbs(self):
         nshell = 0

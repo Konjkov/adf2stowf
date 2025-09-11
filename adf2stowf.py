@@ -270,89 +270,105 @@ Nvalence_cartbasfn = sum(Nvalence_cartbasfn_per_centre)
 # valence orbitals #
 ####################
 
-nsym, = Symmetry["nsym"]
-symlab = Symmetry["symlab"]
+nsym, = Symmetry['nsym']
+symlab = Symmetry['symlab']
 assert len(symlab) == nsym
-norb = Symmetry["norb"]
+norb = Symmetry['norb']
 assert len(norb) == nsym
 
 def select_coeff(sp):
-    X = ["A","B"][sp]
+    """Select valence molecular orbital coefficients for a given spin channel.
 
+    Args:
+       sp (int): Spin index (0 for alpha, 1 for beta)
+
+    Returns:
+       valence_molorb_cart_coeff (np.ndarray): Array of shape (n_orbs, n_basis),
+           containing the selected valence orbital coefficients in Cartesian basis.
+   """
+    X = ['A','B'][sp]  # Label for spin channel: "A" or "B"
+
+    # Lists to store valence orbital data
     valence_molorb_cart_coeff = []
     valence_molorb_occupation = []
     valence_molorb_eigenvalue = []
-
+    # Dictionary to store leftover partial occupations
     partial_occupations = {}
-
+    # Loop over all symmetries
     for sym in range(nsym):
         Section = data[symlab[sym]]
-
-        nmo_X, = Section["nmo_"+X]
+        # Number of orbitals for this spin and symmetry
+        nmo_X, = Section["nmo_" + X]
         assert nmo_X == norb[sym]
-
-        froc_X = Section["froc_"+X]
+        # Fractional occupations for each orbital
+        froc_X = Section["froc_" + X]
         assert len(froc_X) == norb[sym]
-
+        # Skip if all occupations are zero
         if all(froc_X == 0.0):
             continue
-
+        # Indices of basis functions for this symmetry
         npart = Section["npart"] - 1
-
+        # Extract molecular orbital coefficients and eigenvalues
         Eigen_Bas_X = Section["Eigen-Bas_"+X].reshape([nmo_X,len(npart)])
         eps_X = Section["eps_"+X].reshape([nmo_X])
-
+        # Loop over all orbitals
         for o in range(nmo_X):
             eigv = eps_X[o]
 
             valence_molorb_eigenvalue += [eigv]
             occ = froc_X[o]
-
+            # Add any leftover partial occupation for this eigenvalue
             if eigv in partial_occupations:
                 occ += partial_occupations.pop(eigv)
-
+            # Check if orbital is considered "occupied"
             if occ + 1e-8 >= 2.0/Nspins:
                 valence_molorb_occupation += [ 1 ]
                 occ -= 2.0/Nspins
+                # Construct coefficient vector in Cartesian basis
                 coeff = np.zeros((Nvalence_cartbasfn,))
                 coeff[npart] = Eigen_Bas_X[o,:]
                 valence_molorb_cart_coeff += [coeff]
             else:
                 valence_molorb_occupation += [ 0 ]
-
+            # Store leftover fractional occupation
             if occ>1e-8:
                 partial_occupations[eigv] = occ
-
+    # Print any leftover partial occupations
     for k,v in iter(partial_occupations.items()):
         print("spin=",sp,": leftover partial occupation at E=",k,": ",v)
-
+    # Sanity check: should be no leftover occupation
     assert sum(len(p) for p in partial_occupations) == 0
 
     # Nmolorbs_total = len(valence_molorb_eigenvalue)
+    # Number of occupied valence orbitals
     Nmolorbs_occup = len(valence_molorb_cart_coeff)
-
     assert sum(valence_molorb_occupation) == Nmolorbs_occup
-
+    # Convert lists to NumPy arrays
     valence_molorb_occupation = np.array(valence_molorb_occupation)
     valence_molorb_eigenvalue = np.array(valence_molorb_eigenvalue)
+    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
 
+    # Ensure 2D shape even if only one orbital exists (e.g., hydrogen)
+    if valence_molorb_cart_coeff.ndim == 1:
+        valence_molorb_cart_coeff = valence_molorb_cart_coeff.reshape(1, -1)
+
+    # Identify occupied and unoccupied orbitals
     occupied = (valence_molorb_occupation[:] == 1)
     occidx = valence_molorb_eigenvalue[occupied]
     unoccidx = valence_molorb_eigenvalue[~occupied]
-
+    # Check HOMO-LUMO ordering (warning if HOMO > LUMO)
     if len(occidx) > 0 and len(unoccidx) > 0:
         HOMO = max(occidx)
         LUMO = min(unoccidx)
         if HOMO > LUMO:
             print("Warning: HOMO > LUMO (may happen in some cases)")
-
+    # Keep only occupied eigenvalues
     valence_molorb_eigenvalue = valence_molorb_eigenvalue[occupied]
-    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
-
+    # Sanity check: number of orbitals matches number of coefficients
     assert len(valence_molorb_eigenvalue) == Nmolorbs_occup
-
+    # Sort orbitals by eigenvalue
     order = valence_molorb_eigenvalue.argsort()
-    valence_molorb_cart_coeff = valence_molorb_cart_coeff[order,:]
+    valence_molorb_cart_coeff = valence_molorb_cart_coeff[order, :]
 
     return valence_molorb_cart_coeff
 
@@ -486,7 +502,7 @@ coeff = [
 ]
 
 if False:
-    print("molorb sparsity:")
+    print('molorb sparsity:')
     for sp in range(Nspins):
         for i in range(Nmolorbs[sp]):
             print("".join(np.array([".","X"])[(coeff[sp][:,i] != 0.0)*1]))
@@ -500,9 +516,9 @@ norm_per_centre = [ np.concatenate([core_cartnorm_per_atomtype[at],
                     for at in atyp_idx ]
 
 norm_per_harmbasfn = np.concatenate(norm_per_centre)
-#print(norm_per_centre)
-#print(Nharmbasfns)
-#assert len(norm_per_harmbasfn) == Nharmbasfns
+# print(norm_per_centre)
+# print(Nharmbasfns)
+# assert len(norm_per_harmbasfn) == Nharmbasfns
 
 ############
 ############
@@ -516,8 +532,8 @@ sto = stowfn.stowfn()
 
 sto.num_atom = Natoms
 
-sto.title, = General["title"]
-sto.code = "ADF"
+sto.title, = General['title']
+sto.code = 'ADF'
 sto.periodicity = 0
 sto.spin_unrestricted = not spin_restricted
 sto.nuclear_repulsion_energy = 0.0
@@ -526,7 +542,7 @@ assert len(sto.atomcharge) == Natoms
 
 eionion = 0.0
 if Natoms > 1:
-    adist = Geometry["Atomic Distances"].reshape(Natoms+1,Natoms+1)[1:,1:]
+    adist = Geometry['Atomic Distances'].reshape(Natoms+1,Natoms+1)[1:,1:]
     for i in range(Natoms):
         assert adist[i,i] == 0.0
         for j in range(i):
@@ -536,14 +552,14 @@ if Natoms > 1:
 sto.nuclear_repulsion_energy = eionion/Natoms
 
 sto.num_elec = Nvalence_electrons + 2*Ncore_molorbs
-sto.atompos = Geometry["xyz"].reshape(Natoms+Ndummies,3)[:Natoms,:]
+sto.atompos = Geometry['xyz'].reshape(Natoms+Ndummies,3)[:Natoms,:]
 sto.atomnum = atomicnumber_per_atomtype[atyp_idx]
 
 ###############
 # basis set
 
 sto.num_centres = int(Natoms)
-sto.centrepos = Geometry["xyz"].reshape(Natoms+Ndummies,3)[:Natoms,:]
+sto.centrepos = Geometry['xyz'].reshape(Natoms+Ndummies,3)[:Natoms,:]
 sto.num_shells = sum(Nshells_per_centre)
 
 sto.idx_first_shell_on_centre = np.array([0] + list(np.cumsum(Nshells_per_centre)))
@@ -555,116 +571,148 @@ sto.zeta = np.concatenate(zeta_per_centre)
 sto.num_atorbs = Nharmbasfns
 sto.num_molorbs = Nmolorbs
 sto.coeff = [ c.T for c in coeff ]
-sto.footer = ""
+sto.footer = ''
 
 sto.check_and_normalize()
 
 # check norm
 
 if False:
-    print("Norm-ADF (cartesian)")
+    print('Norm-ADF (cartesian)')
     print(norm_per_harmbasfn)
-    print("Norm-computed (minimal basis)")
+    print('Norm-computed (minimal basis)')
     print(sto.get_norm())
-#print(norm_per_harmbasfn - sto.get_norm())
+# print(norm_per_harmbasfn - sto.get_norm())
 
 np.set_printoptions(suppress=True)
 
-#assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+# assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 cusp_fixed_atorbs = sto.cusp_fixed_atorbs()
 cusp_constraint = sto.cusp_constraint_matrix()
-#print("cusp_constraint_matrix:")
-#print(cusp_constraint)
-#cusp_projection = sto.cusp_projection_matrix()
+# print("cusp_constraint_matrix:")
+# print(cusp_constraint)
+# cusp_projection = sto.cusp_projection_matrix()
 cusp_enforcing = sto.cusp_enforcing_matrix()
 
-print("Molorb values at nuclei before applying cusp constraint:")
+print('Molorb values at nuclei before applying cusp constraint:')
 print(sto.eval_molorbs(sto.atompos.transpose()))
 
-fixed = [ np.zeros(Nmolorbs[sp],bool) for sp in range(Nspins) ]
+# Initialize a list of boolean masks, one per spin channel.
+# Each mask has length equal to the number of molecular orbitals (Nmolorbs[sp]) for that spin.
+# Initially, all values are False (no violations detected yet).
+fixed = [np.zeros(Nmolorbs[sp], bool) for sp in range(Nspins)]
 
 for sp in range(Nspins):
     for i in range(Nmolorbs[sp]):
-        constraint_violation = cusp_constraint @ coeff[sp][:,i]
+        # Compute the cusp constraint violation for orbital i of spin sp
+        constraint_violation = cusp_constraint @ coeff[sp][:, i]
+        # If any component of the violation is larger than the tolerance (1e-9),
+        # we mark this orbital as "fixed" (problematic) and handle it.
         if np.any(np.abs(constraint_violation) > 1e-9):
             fixed[sp][i] = True
-            print("spin #%i, orb #%i - constraint violation by:"%(sp,i),constraint_violation)
+            print("spin #%i, orb #%i - constraint violation by:" % (sp, i), constraint_violation)
             if CUSP_ENFORCE:
+                # Show original coefficients for the constrained atomic orbitals
                 print("    original coefficients:    ",coeff[sp][cusp_fixed_atorbs,i])
-        #    projected_coeff = cusp_projection.A @ coeff[:,i]
-        #    print("    proj coeff:",projected_coeff)
-        #    print("    after projection       :", cusp_constraint @ projected_coeff)
-
+                # Projected coefficients (alternative approach, commented out)
+                # projected_coeff = cusp_projection.A @ coeff[:,i]
+                # print("    proj coeff:",projected_coeff)
+                # print("    after projection       :", cusp_constraint @ projected_coeff)
+                # Apply the cusp enforcing projection to fix the coefficients
                 enforced_coeff = cusp_enforcing.A @ coeff[sp][:,i]
                 print("    constrained coefficients: ",enforced_coeff[cusp_fixed_atorbs])
+                # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:,i] = enforced_coeff
-
+                # Re-check that constraint violation is now within the stricter tolerance
                 constraint_violation = cusp_constraint @ coeff[sp][:,i]
                 assert np.all(np.abs(constraint_violation) < 1e-8)
-        #    print("    after enforcing        :", cusp_constraint @ enforced_coeff)
+                # print("    after enforcing        :", cusp_constraint @ enforced_coeff)
 
 if PLOTCUSPS:
-    z = np.linspace(-.5,.5,501)
-    r = [ np.zeros((3,len(z))) + sto.atompos[at,:][:,None] for at in range(sto.num_atom) ]
-    for ir in r: ir[2,:] += z
+    # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
+    z = np.linspace(-0.5, 0.5, 501)
+    r = [np.zeros((3,len(z))) + sto.atompos[at,:][:,None] for at in range(sto.num_atom)]
+    for ir in r:
+        ir[2, :] += z
+    # Print the boolean masks (which orbitals are marked as violating cusp conditions)
     print(fixed)
-    val_pre = [ [ sto.eval_molorbs(ir,spin=sp)[:,fixed[sp]] for sp in range(Nspins) ] for ir in r ]
-    lap_pre = [ [ sto.eval_molorb_derivs(ir,spin=sp)[2][:,fixed[sp]]
-                  for sp in range(Nspins) ] for ir in r ]
+    val_pre = [[sto.eval_molorbs(ir, spin=sp)[:, fixed[sp]] for sp in range(Nspins)] for ir in r]
+    lap_pre = [[sto.eval_molorb_derivs(ir, spin=sp)[2][:, fixed[sp]] for sp in range(Nspins)] for ir in r]
 
 sto.coeff = [ c.T for c in coeff ]
 sto.check_and_normalize()
 
 if PLOTCUSPS:
-    val_post = [ [ sto.eval_molorbs(ir,spin=sp)[:,fixed[sp]] for sp in range(Nspins) ] for ir in r ]
-    lap_post = [ [ sto.eval_molorb_derivs(ir,spin=sp)[2][:,fixed[sp]]
-                   for sp in range(Nspins) ] for ir in r ]
+    val_post = [[sto.eval_molorbs(ir, spin=sp)[:, fixed[sp]] for sp in range(Nspins)] for ir in r]
+    lap_post = [[sto.eval_molorb_derivs(ir, spin=sp)[2][:, fixed[sp]] for sp in range(Nspins)] for ir in r]
 
 if CUSP_ENFORCE:
-    print("Molorb values at nuclei after applying cusp constraint:")
+    print('Molorb values at nuclei after applying cusp constraint:')
     print(sto.eval_molorbs(sto.atompos.transpose()))
-    #assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+    # assert all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
-sto.writefile("stowfn.data")
+sto.writefile('stowfn.data')
 
 if PLOTCUSPS:
     try:
-        import pylab
+        import matplotlib.pyplot as plt
     except ImportError:
-        print('The PLOTCUSPS feature requires the pylab library, which could')
-        print('not be found.')
+        print('The PLOTCUSPS feature requires the matplotlib library, which could not be found.')
         sys.exit()
     Natom = sto.num_atom
-    axval = [ pylab.subplot(2,Natom,at+1) for at in range(Natom) ]
-    axeloc = [ pylab.subplot(2,Natom,Natom+at+1) for at in range(Natom) ]
+    # Create a 2 x Natom grid of subplots
+    # Top row: wavefunction values (val)
+    # Bottom row: local energies (eloc)
+    fig, axes = plt.subplots(2, Natom, figsize=(4*Natom, 4))
+    # If only one atom, reshape axes into 2D array for consistency
+    if Natom == 1:
+        axes = np.array([axes]).reshape(2, 1)
+    axval  = [axes[0, at] for at in range(Natom)]
+    axeloc = [axes[1, at] for at in range(Natom)]
     for at in range(Natom):
         eloc_min = 1e8
         eloc_max = -1e8
         for sp in range(Nspins):
             for i in range(sum(fixed[sp])):
-                vpre = val_pre[at][sp][:,i]
-                vpost = val_post[at][sp][:,i]
-                sgn = np.sign(vpre[len(vpre)//2])
-                print(at,sp,i)
-                pl, = axval[at].plot(z,sgn*vpre,'--')
+                vpre = val_pre[at][sp][:, i]  # wavefunction before correction
+                vpost = val_post[at][sp][:, i]  # wavefunction after correction
+                sgn = np.sign(vpre[len(vpre)//2])  # sign normalization
+                # Plot wavefunction before and after correction
+                pl, = axval[at].plot(z, sgn*vpre, '--')
                 axval[at].plot(z,sgn*vpost,color=pl.get_color())
-            #      pl, = axeloc[at].plot(z,lap_pre[at][sp][:,i]+sto.atomnum[at]/z,'--')
-                eloc_pre = -0.5*lap_pre[at][sp][:,i]/val_pre[at][sp][:,i]-sto.atomnum[at]/np.abs(z)
-                eloc_post = -0.5*lap_post[at][sp][:,i]/val_post[at][sp][:,i]-sto.atomnum[at]/np.abs(z)
+                # Plot Laplacian of the wavefunction + Coulomb term (without normalization).
+                # pl, = axeloc[at].plot(z, lap_pre[at][sp][:,i] + sto.atomnum[at]/z, '--')
+                # Compute local energy before and after correction:
+                # E_loc = -0.5 * (Laplacian / wavefunction) - Z / |r|
+                eloc_pre = -0.5 * lap_pre[at][sp][:,i] / val_pre[at][sp][:, i] - sto.atomnum[at] / np.abs(z)
+                eloc_post = -0.5 * lap_post[at][sp][:,i] / val_post[at][sp][:, i] - sto.atomnum[at] / np.abs(z)
+                # Plot local energy before and after correction
                 axeloc[at].plot(z,eloc_pre,'--',color=pl.get_color())
                 axeloc[at].plot(z,eloc_post,'-',color=pl.get_color())
-                eloc_min = min(eloc_min,eloc_post[0],eloc_post[-1],
-                               eloc_post[len(eloc_post)//2-1],eloc_post[len(eloc_post)//2+1])
-                eloc_max = max(eloc_min,eloc_post[0],eloc_post[-1],
-                               eloc_post[len(eloc_post)//2-1],eloc_post[len(eloc_post)//2+1])
-
-        eloc_mid = .5*(eloc_min+eloc_max)
-        eloc_min = (eloc_min-eloc_mid)*1.5+eloc_mid
-        eloc_max = (eloc_max-eloc_mid)*1.5+eloc_mid
-        axval[at].set_xlim(z[0],z[-1])
-        axeloc[at].set_xlim(z[0],z[-1])
-        axeloc[at].set_ylim(eloc_min,eloc_max)
-
-    pylab.gcf().set_size_inches(4,4)
-    pylab.savefig("cusp_constraint.svg")
+                # Track min/max values for axis scaling
+                eloc_min = min(
+                    eloc_min,
+                    eloc_post[0],
+                    eloc_post[-1],
+                    eloc_post[len(eloc_post)//2-1],
+                    eloc_post[len(eloc_post)//2+1],
+                )
+                eloc_max = max(
+                    eloc_min,
+                    eloc_post[0],
+                    eloc_post[-1],
+                    eloc_post[len(eloc_post)//2-1],
+                    eloc_post[len(eloc_post)//2+1],
+                )
+        # Expand y-limits around the middle value for better visualization
+        eloc_mid = (eloc_min + eloc_max) / 2
+        eloc_min = (eloc_min - eloc_mid)*1.5 + eloc_mid
+        eloc_max = (eloc_max - eloc_mid)*1.5 + eloc_mid
+        # Set axis ranges
+        axval[at].set_xlim(z[0], z[-1])
+        axeloc[at].set_xlim(z[0], z[-1])
+        axeloc[at].set_ylim(eloc_min, eloc_max)
+    # Adjust layout and save figure
+    fig.tight_layout()
+    fig.savefig('cusp_constraint.svg')

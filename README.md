@@ -19,10 +19,27 @@ The script has been verified to work with:
     Python 3.9.23
     NumPy 1.26.4
     scipy-weave 0.19.0
+    зништв 3.0.1
 
 For optional plotting of the cusp constraints
 
     Matplotlib 3.9.4
+
+
+Build instructions
+==================
+
+Then build the extension in place:
+
+    cd path/to/adf2stowf
+    python3 setup.py build_ext --inplace
+
+This will create a shared library file, for example:
+
+    stowfn_norm.cpython-39-x86_64-linux-gnu.so
+
+in the same directory.
+The script `adf2stowf.py` will then be able to import it automatically.
 
 
 Usage
