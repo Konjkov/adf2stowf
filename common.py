@@ -17,17 +17,6 @@ pi = np.pi
 F2P_bool={".false.":False,".true.":True}
 P2F_bool={False:".false.",True:".true."}
 
-def mapunion(a,b):
-    res = a.copy()
-    res.update(b)
-    return res
-
-import inspect
-
-def lineno():
-    """Returns the current line number in our program."""
-    return inspect.currentframe().f_back.f_lineno
-
 All = slice(None,None,None)
 
 def integral(fx,x):
@@ -36,22 +25,3 @@ def integral(fx,x):
 
 def cyl_integral(f,phi,rho,z):
     return integral(integral(integral(rho[(None,All,) + (None,)*(len(f.shape)-2)]*f,phi),rho),z)
-
-def weave_inline(support_code,code,dict,defs=[]):
-    try:
-        import weave
-    except ImportError:
-        print('This program requires the scipy library, which could not be')
-        print('found.')
-        sys.exit()
-    weave.inline(
-        headers = ["<cstdlib>","<cmath>"],
-        support_code = "\n".join(["#define "+d for d in defs] + [support_code]),
-        code = "\n".join(["// #define "+d for d in defs] + [code]),
-        arg_names = dict.keys(),
-        local_dict = dict,
-        type_converters = weave.converters.blitz,
-        compiler = 'gcc',
-        extra_compile_args = ["-Wno-all"],
-        verbose = 1,
-    )
