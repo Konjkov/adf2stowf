@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3
 
 # (C) 2008 Norbert Nemec
 # This file is part of the CASINO distribution.

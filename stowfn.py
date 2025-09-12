@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.9
+#!/usr/bin/env python3
 
 # (C) 2008 Norbert Nemec
 # This file is part of the CASINO distribution.
@@ -562,16 +562,29 @@ class stowfn:
 
         return val
 
-    def eval_molorb_derivs(self,pos,spin=0):
+    def eval_molorb_derivs(self, pos, spin=0):
         num_points = pos.shape[1]
-        assert pos.shape == (3,num_points)
+        assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
-        val = np.zeros((num_points,num_molorbs))
-        grad = np.zeros((3,num_points,num_molorbs))
-        lap = np.zeros((num_points,num_molorbs))
-        coeff_norm = self.coeff_norm[spin]
-        dict = mapunion(self.__dict__,locals())
-        weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS","CALC_DERIVS"])
+
+        val = np.zeros((num_points, num_molorbs))
+        grad = np.zeros((3, num_points, num_molorbs))
+        lap = np.zeros((num_points, num_molorbs))
+
+        stowfn_cpp.eval_molorb_derivs(
+            pos.astype(float),  # (3, num_points)
+            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
+            self.centrepos.astype(float),  # (num_centres,3)
+            np.asarray(self.coeff_norm[spin], dtype=float),  # (num_molorbs,num_atorbs)
+            val,  # (num_points,num_molorbs) output
+            grad,  # (3,num_points,num_molorbs) output
+            lap  # (num_points,num_molorbs) output
+        )
+
         return val, grad, lap
 
     def eval_atorbs(self, pos):
