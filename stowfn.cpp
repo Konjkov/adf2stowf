@@ -134,15 +134,15 @@ void eval_atorbs(
         for (int a = 0; a < num_atorbs; ++a)
             buf_at(p,a) = 0.0;
 
-    // Polynomials (up to g-orbitals maximum)
-    std::vector<double> poly(25, 0.0);
-
     int n_shell = 0;
     int n_atorb = 0;
 
     for (int pt = 0; pt < num_points; ++pt) {
         n_shell = 0;
         n_atorb = 0;
+
+        // Polynomials (up to g-orbitals maximum)
+        std::vector<double> poly(25, 0.0);
 
         for (int centre = 0; centre < num_centres; ++centre) {
             // coords relative to centre
@@ -268,17 +268,17 @@ void eval_molorbs(
     int num_points  = buf_pos.shape(1);
     int num_molorbs = buf_coeff.shape(0);
 
-    // Polynomials (up to g-orbitals maximum)
-    std::vector<double> poly(25, 0.0);
-
     for (int pt = 0; pt < num_points; ++pt) {
-        // Zero out MO values
+        // Zero out MO values for the current point
         for (int mo = 0; mo < num_molorbs; ++mo) {
             buf_val(pt, mo) = 0.0;
         }
 
         int n_shell = 0;
         int n_atorb = 0;
+
+        // Polynomials (up to g-orbitals maximum)
+        std::vector<double> poly(25, 0.0);
 
         for (ssize_t centre = 0; centre < buf_num_sh.shape(0); ++centre) {
             double x = buf_pos(0, pt) - buf_cpos(centre, 0);
