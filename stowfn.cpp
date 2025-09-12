@@ -136,7 +136,7 @@ void eval_atorbs(
         for (int a = 0; a < num_atorbs; ++a)
             buf_at(p,a) = 0.0;
 
-    // temporary arrays
+    // Polynomials (up to g-orbitals maximum)
     std::vector<double> poly(25, 0.0);
 
     int n_shell = 0;
@@ -169,8 +169,7 @@ void eval_atorbs(
                 rvec[1] = r1;
             }
 
-            // build polynomials
-            for (int i = 0; i < 25; ++i) poly[i] = 0.0;
+            // s and p-orbitals
             poly[0] = 1.0;
             poly[1] = x;
             poly[2] = y;
@@ -178,6 +177,7 @@ void eval_atorbs(
 
             int max_sh_type = buf_max_sh(centre);
             if (max_sh_type >= 4) {
+                // d-orbitals
                 double xy = x*y;
                 double yz = y*z;
                 double zx = z*x;
@@ -188,6 +188,7 @@ void eval_atorbs(
                 poly[8] = xx - yy;
 
                 if (max_sh_type >= 5) {
+                    // f-orbitals
                     double t1 = 5*zz - r2;
                     poly[9]  = (2*zz - 3*(xx + yy)) * z;
                     poly[10] = t1 * x;
@@ -198,6 +199,7 @@ void eval_atorbs(
                     poly[15] = (3.0*xx - yy) * y;
 
                     if (max_sh_type >= 6) {
+                        // g-orbitals
                         double xx_yy3 = xx - 3*yy;
                         double xx3_yy = 3*xx - yy;
                         double xx_yy = xx - yy;
@@ -265,15 +267,149 @@ void eval_atorbs(
     } // pt
 }
 
+void eval_molorbs(
+    py::array_t<double, py::array::c_style | py::array::forcecast> pos,           // (3, num_points)
+    py::array_t<int,    py::array::c_style | py::array::forcecast> num_shells_on_centre,
+    py::array_t<int,    py::array::c_style | py::array::forcecast> shelltype,
+    py::array_t<int,    py::array::c_style | py::array::forcecast> order_r_in_shell,
+    //py::array_t<int,    py::array::c_style | py::array::forcecast> max_order_r_on_centre,
+    py::array_t<int,    py::array::c_style | py::array::forcecast> max_shell_type_on_centre,
+    py::array_t<double, py::array::c_style | py::array::forcecast> zeta,
+    py::array_t<double, py::array::c_style | py::array::forcecast> centrepos,     // (num_centres, 3)
+    py::array_t<double, py::array::c_style | py::array::forcecast> coeff_norm,    // (num_molorbs, num_atorbs)
+    py::array_t<double, py::array::c_style | py::array::forcecast> val            // (num_points, num_molorbs)
+) {
+    auto buf_pos      = pos.unchecked<2>();
+    auto buf_num_sh   = num_shells_on_centre.unchecked<1>();
+    auto buf_shellt   = shelltype.unchecked<1>();
+    auto buf_ord_r    = order_r_in_shell.unchecked<1>();
+    //auto buf_max_ord  = max_order_r_on_centre.unchecked<1>();
+    auto buf_max_sh   = max_shell_type_on_centre.unchecked<1>();
+    auto buf_zeta     = zeta.unchecked<1>();
+    auto buf_cpos     = centrepos.unchecked<2>();
+    auto buf_coeff    = coeff_norm.unchecked<2>();
+    auto buf_val      = val.mutable_unchecked<2>();
+
+    int num_points  = buf_pos.shape(1);
+    int num_molorbs = buf_coeff.shape(0);
+
+    // Polynomials (up to g-orbitals maximum)
+    std::vector<double> poly(25, 0.0);
+
+    for (int pt = 0; pt < num_points; ++pt) {
+        // Zero out MO values
+        for (int mo = 0; mo < num_molorbs; ++mo) {
+            buf_val(pt, mo) = 0.0;
+        }
+
+        int n_shell = 0;
+        int n_atorb = 0;
+
+        for (ssize_t centre = 0; centre < buf_num_sh.shape(0); ++centre) {
+            double x = buf_pos(0, pt) - buf_cpos(centre, 0);
+            double y = buf_pos(1, pt) - buf_cpos(centre, 1);
+            double z = buf_pos(2, pt) - buf_cpos(centre, 2);
+
+            double xx = x * x;
+            double yy = y * y;
+            double zz = z * z;
+
+            double r2 = xx + yy + zz;
+            double r  = std::sqrt(r2);
+
+            // s and p-orbitals
+            poly[0] = 1.0;
+            poly[1] = x;
+            poly[2] = y;
+            poly[3] = z;
+
+            if (buf_max_sh(centre) >= 4) {
+                // d-orbitals
+                poly[4] = x * y;
+                poly[5] = y * z;
+                poly[6] = z * x;
+                poly[7] = 3*zz - r2;
+                poly[8] = xx - yy;
+
+                if (buf_max_sh(centre) >= 5) {
+                    // f-orbitals
+                    double t1 = 5*zz - r2;
+                    poly[ 9] = (2*zz - 3*(xx+yy))*z;
+                    poly[10] = t1 * x;
+                    poly[11] = t1 * y;
+                    poly[12] = (xx - yy) * z;
+                    poly[13] = x * y * z;
+                    poly[14] = (xx - 3*yy) * x;
+                    poly[15] = (3*xx - yy) * y;
+
+                    if (buf_max_sh(centre) >= 6) {
+                        // g-orbitals
+                        double xx_yy3   = xx - 3*yy;
+                        double xx3_yy   = 3*xx - yy;
+                        double xx_yy    = xx - yy;
+                        double zz5      = 5*zz;
+                        double zz7      = 7*zz;
+                        double rr3      = 3*r2;
+                        double zz7_rr   = zz7 - r2;
+                        double zz7_rr3  = zz7 - rr3;
+
+                        poly[16] = zz5*zz7_rr3 - (zz5 - r2)*rr3;
+                        poly[17] = (z*x) * zz7_rr3;
+                        poly[18] = (y*z) * zz7_rr3;
+                        poly[19] = xx_yy * zz7_rr;
+                        poly[20] = (x*y) * zz7_rr;
+                        poly[21] = (z*x) * xx_yy3;
+                        poly[22] = (y*z) * xx3_yy;
+                        poly[23] = xx*xx_yy3 - yy*xx3_yy;
+                        poly[24] = (x*y) * xx_yy;
+                    }
+                }
+            }
+
+            // Loop over all shells on the center
+            for (int shell = 0; shell < buf_num_sh(centre); ++shell, ++n_shell) {
+                int sh_type  = buf_shellt(n_shell);
+                int first_pl = first_poly_in_shell_type[sh_type];
+                int num_pl   = num_poly_in_shell_type[sh_type];
+
+                double zeta_rabs = buf_zeta(n_shell) * r;
+                if (zeta_rabs > 746.0) {
+                    n_atorb += num_pl;
+                    continue; // Exponent is too large
+                }
+                double exp_val = std::exp(-zeta_rabs);
+
+                int N = buf_ord_r(n_shell);
+
+                for (int pl = 0; pl < num_pl; ++pl, ++n_atorb) {
+                    double phi_val = poly[first_pl + pl] * exp_val;
+                    if (N > 0) {
+                        // Additional factor of r^N
+                        phi_val *= std::pow(r, N);
+                    }
+
+                    // Add contribution to all MOs
+                    for (int mo = 0; mo < num_molorbs; ++mo) {
+                        buf_val(pt, mo) += buf_coeff(mo, n_atorb) * phi_val;
+                    }
+                }
+            } // shell
+        } // centre
+    } // pt
+}
+
+
 
 PYBIND11_MODULE(stowfn_cpp, m) {
-    m.doc() = "STO wfn helper functions";
+    m.doc() = "Slater-type orbital utilities (norms, AO, MO)";
+
     m.def("compute_norm", &compute_norm,
           py::arg("num_shells_on_centre"),
           py::arg("shelltype"),
           py::arg("order_r_in_shell"),
           py::arg("zeta"),
           py::arg("norm_array"));
+
     m.def("eval_atorbs", &eval_atorbs,
           py::arg("pos"),
           py::arg("centrepos"),
@@ -284,4 +420,16 @@ PYBIND11_MODULE(stowfn_cpp, m) {
           py::arg("order_r_in_shell"),
           py::arg("zeta"),
           py::arg("atorbs"));
+
+    m.def("eval_molorbs", &eval_molorbs,
+          py::arg("pos"),
+          py::arg("num_shells_on_centre"),
+          py::arg("shelltype"),
+          py::arg("order_r_in_shell"),
+          //py::arg("max_order_r_on_centre"),
+          py::arg("max_shell_type_on_centre"),
+          py::arg("zeta"),
+          py::arg("centrepos"),
+          py::arg("coeff_norm"),
+          py::arg("val"));
 }

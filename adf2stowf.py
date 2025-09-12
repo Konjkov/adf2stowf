@@ -17,7 +17,7 @@ except ImportError:
 
 ############
 
-PLOTCUSPS = True
+PLOTCUSPS = False
 CUSP_ENFORCE = True
 
 ############

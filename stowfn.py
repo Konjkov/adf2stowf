@@ -542,14 +542,24 @@ class stowfn:
             else:
                 raise "unknown block starting with '"+l[start]+"'"
 
-    def eval_molorbs(self,pos,spin=0):
+    def eval_molorbs(self, pos, spin=0):
         num_points = pos.shape[1]
-        assert pos.shape == (3,num_points)
+        assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
-        val = np.zeros((num_points,num_molorbs))
-        coeff_norm = self.coeff_norm[spin]
-        dict = mapunion(self.__dict__,locals())
-        weave_inline(support_code,eval_code,dict,["EVAL_MOLORBS"])
+        val = np.zeros((num_points, num_molorbs))
+
+        stowfn_cpp.eval_molorbs(
+            pos.astype(float),  # (3, num_points)
+            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
+            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
+            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
+            self.centrepos.astype(float),  # (num_centres, 3)
+            np.asarray(self.coeff_norm[spin], dtype=float),  # (num_molorbs, num_atorbs)
+            val  # output (num_points, num_molorbs)
+        )
+
         return val
 
     def eval_molorb_derivs(self,pos,spin=0):
