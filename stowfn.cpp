@@ -102,7 +102,6 @@ void eval_atorbs(
     py::array_t<double, py::array::c_style | py::array::forcecast> pos,                 // (3, num_points)
     py::array_t<double, py::array::c_style | py::array::forcecast> centrepos,          // (num_centres, 3)
     py::array_t<int,    py::array::c_style | py::array::forcecast> num_shells_on_centre,// (num_centres,)
-    py::array_t<int,    py::array::c_style | py::array::forcecast> max_order_r_on_centre,// (num_centres,)
     py::array_t<int,    py::array::c_style | py::array::forcecast> max_shell_type_on_centre,// (num_centres,)
     py::array_t<int,    py::array::c_style | py::array::forcecast> shelltype,          // (num_shells_total,)
     py::array_t<int,    py::array::c_style | py::array::forcecast> order_r_in_shell,   // (num_shells_total,)
@@ -120,16 +119,15 @@ void eval_atorbs(
     auto buf_pos     = pos.unchecked<2>();        // (3, num_points)
     auto buf_centre  = centrepos.unchecked<2>();  // (num_centres,3)
     auto buf_num_sh  = num_shells_on_centre.unchecked<1>();
-    auto buf_max_ord = max_order_r_on_centre.unchecked<1>();
     auto buf_max_sh  = max_shell_type_on_centre.unchecked<1>();
-    auto buf_shellt   = shelltype.unchecked<1>();
+    auto buf_shellt  = shelltype.unchecked<1>();
     auto buf_order_r = order_r_in_shell.unchecked<1>();
     auto buf_zeta    = zeta.unchecked<1>();
     auto buf_at      = atorbs.mutable_unchecked<2>(); // (num_points, num_atorbs)
 
-    int num_points = (int)buf_pos.shape(1);
-    int num_centres = (int)buf_centre.shape(0);
-    int num_atorbs = (int)buf_at.shape(1);
+    int num_points   = (int)buf_pos.shape(1);
+    int num_centres  = (int)buf_centre.shape(0);
+    int num_atorbs   = (int)buf_at.shape(1);
 
     // initialize output to zero (mirrors np.zeros)
     for (int p = 0; p < num_points; ++p)
@@ -157,17 +155,6 @@ void eval_atorbs(
 
             double r2 = xx + yy + zz;
             double r1 = std::sqrt(r2);
-            int max_order = buf_max_ord(centre); // may be 0
-
-            std::vector<double> rvec(std::max(2, max_order+1)+1, 0.0); // ensure room
-            // we will index rvec[k] == r(k), k>=0
-            if (max_order >= 1) {
-                rvec[1] = r1;
-                for (int i = 2; i <= max_order; ++i) rvec[i] = rvec[i-1] * r1;
-            } else {
-                // ensure rvec[1] exists
-                rvec[1] = r1;
-            }
 
             // s and p-orbitals
             poly[0] = 1.0;
@@ -226,11 +213,10 @@ void eval_atorbs(
             int shells_on_centre = buf_num_sh(centre);
             for (int shell = 0; shell < shells_on_centre; ++shell, ++n_shell) {
                 // check exponent cutoff
-                double zeta_rabs = buf_zeta(n_shell) * rvec[1];
+                double zeta_rabs = buf_zeta(n_shell) * r1;
                 if (zeta_rabs > sto_exp_cutoff) {
                     // skip all orbitals in this shell
-                    int skip = num_poly_in_shell_type[ buf_shellt(n_shell) ];
-                    n_atorb += skip;
+                    n_atorb += num_poly_in_shell_type[ buf_shellt(n_shell) ];
                     continue;
                 }
                 double exp_zeta_rabs = std::exp(-zeta_rabs);
@@ -238,19 +224,10 @@ void eval_atorbs(
                 int st = buf_shellt(n_shell);
                 int A0 = first_poly_in_shell_type[st];
                 int npoly = num_poly_in_shell_type[st];
-
-                // phi(pl) = poly(A)*exp(-zeta_rabs)
-                // if order_r_in_shell == 0: phi(pl)
-                // else: r(N)*phi(pl)
                 int N = buf_order_r(n_shell);
                 double rN = 1.0;
                 if (N > 0) {
-                    if ((int)rvec.size() > N) rN = rvec[N];
-                    else {
-                        // compute up to N if required
-                        rN = 1.0;
-                        for (int i = 1; i <= N; ++i) rN *= r1;
-                    }
+                    rN = std::pow(r1, N);
                 }
 
                 for (int pl = 0; pl < npoly; ++pl) {
@@ -272,7 +249,6 @@ void eval_molorbs(
     py::array_t<int,    py::array::c_style | py::array::forcecast> num_shells_on_centre,
     py::array_t<int,    py::array::c_style | py::array::forcecast> shelltype,
     py::array_t<int,    py::array::c_style | py::array::forcecast> order_r_in_shell,
-    //py::array_t<int,    py::array::c_style | py::array::forcecast> max_order_r_on_centre,
     py::array_t<int,    py::array::c_style | py::array::forcecast> max_shell_type_on_centre,
     py::array_t<double, py::array::c_style | py::array::forcecast> zeta,
     py::array_t<double, py::array::c_style | py::array::forcecast> centrepos,     // (num_centres, 3)
@@ -283,7 +259,6 @@ void eval_molorbs(
     auto buf_num_sh   = num_shells_on_centre.unchecked<1>();
     auto buf_shellt   = shelltype.unchecked<1>();
     auto buf_ord_r    = order_r_in_shell.unchecked<1>();
-    //auto buf_max_ord  = max_order_r_on_centre.unchecked<1>();
     auto buf_max_sh   = max_shell_type_on_centre.unchecked<1>();
     auto buf_zeta     = zeta.unchecked<1>();
     auto buf_cpos     = centrepos.unchecked<2>();
@@ -414,7 +389,6 @@ PYBIND11_MODULE(stowfn_cpp, m) {
           py::arg("pos"),
           py::arg("centrepos"),
           py::arg("num_shells_on_centre"),
-          py::arg("max_order_r_on_centre"),
           py::arg("max_shell_type_on_centre"),
           py::arg("shelltype"),
           py::arg("order_r_in_shell"),
@@ -426,7 +400,6 @@ PYBIND11_MODULE(stowfn_cpp, m) {
           py::arg("num_shells_on_centre"),
           py::arg("shelltype"),
           py::arg("order_r_in_shell"),
-          //py::arg("max_order_r_on_centre"),
           py::arg("max_shell_type_on_centre"),
           py::arg("zeta"),
           py::arg("centrepos"),

@@ -582,7 +582,6 @@ class stowfn:
             pos.astype(float),  # (3,num_points)
             self.centrepos.astype(float),  # (num_centres,3)
             np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.max_order_r_on_centre, dtype=np.int32),  # (num_centres,)
             np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
             np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
             np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
