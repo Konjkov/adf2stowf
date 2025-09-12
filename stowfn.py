@@ -5,9 +5,11 @@
 # Permission is given to use the script along with the CASINO program and modify
 # it for personal use.
 
-
-from common import *
 import stowfn_cpp
+import numpy as np
+
+F2P_bool={".false.":False,".true.":True}
+P2F_bool={False:".false.",True:".true."}
 
 num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 

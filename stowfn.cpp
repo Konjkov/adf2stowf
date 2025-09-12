@@ -474,7 +474,7 @@ void eval_molorb_derivs(
                     dpoly[0][15] = 6*x*y;        dpoly[1][15] = 3*xx-3*yy;    dpoly[2][15] = 0;
 
                     if (max_sh_type>=6) {
-                        // g-orbitals (примерный набор 9 функций)
+                        // g-orbitals
                         poly[16] = xx*xx - 6*xx*yy + yy*yy;
                         poly[17] = (xx-yy)*xy;
                         poly[18] = (xx-yy)*z*z;
@@ -485,10 +485,7 @@ void eval_molorb_derivs(
                         poly[23] = (xx-3*yy)*xy;
                         poly[24] = (3*xx-yy)*xy;
 
-                        // для простоты производные g можно расписать по аналогии
-                        // (в оригинале weave_inline были развернуты)
-                        // здесь следует вписать формулы  dpoly[..][16..24]
-                        // и они будут использоваться далее
+                        // dpoly not implemented
                     }
                 }
             }
