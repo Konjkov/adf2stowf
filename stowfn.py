@@ -8,8 +8,8 @@
 import stowfn_cpp
 import numpy as np
 
-F2P_bool={".false.":False,".true.":True}
-P2F_bool={False:".false.",True:".true."}
+F2P_bool={'.false.':False,'.true.':True}
+P2F_bool={False:'.false.',True:'.true.'}
 
 num_orbs_per_shelltype = np.array([0,1,4,3,5,7,9])
 
@@ -25,7 +25,7 @@ class stowfn:
         pass
 
     def readfile(self,fname):
-        f=file(fname)
+        f = open(fname, 'r')
 
         def readline():
             return f.readline()
@@ -274,7 +274,7 @@ class stowfn:
         writeline("GS")
         writeline()
 
-        if hasattr(self,"coeff_norm"):
+        if hasattr(self, "coeff_norm"):
             writeline("ORBITAL COEFFICIENTS (normalized AO)")
             writeline("------------------------------------")
             coeff = self.coeff_norm[0][:,:] / self.get_norm()[None,:]
@@ -294,7 +294,7 @@ class stowfn:
         f.writelines(self.footer)
         f.close()
 
-    def read_molorbmods(self,fname="correlation.data"):
+    def read_molorbmods(self, fname="correlation.data"):
         l = [ l.strip() for l in open(fname,"r").readlines() ]
         start = l.index("START MOLORBMODS")+3
         end = l.index("END MOLORBMODS")
@@ -311,6 +311,15 @@ class stowfn:
                 raise "unknown block starting with '"+l[start]+"'"
 
     def eval_molorbs(self, pos, spin=0):
+        """Evaluate molecular orbitals at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
+
+        Returns:
+            numpy.ndarray: Values of molecular orbitals (num_points, num_molorbs).
+        """
         num_points = pos.shape[1]
         assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
@@ -331,6 +340,18 @@ class stowfn:
         return val
 
     def eval_molorb_derivs(self, pos, spin=0):
+        """Evaluate molecular orbitals, gradients, and Laplacians.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
+
+        Returns:
+            tuple:
+                - val (numpy.ndarray): Orbital values (num_points, num_molorbs).
+                - grad (numpy.ndarray): Orbital gradients (3, num_points, num_molorbs).
+                - lap (numpy.ndarray): Orbital Laplacians (num_points, num_molorbs).
+        """
         num_points = pos.shape[1]
         assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
@@ -356,6 +377,14 @@ class stowfn:
         return val, grad, lap
 
     def eval_atorbs(self, pos):
+        """Evaluate atomic orbitals (AOs) at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+
+        Returns:
+            numpy.ndarray: AO values (num_points, num_atorbs).
+        """
         num_points = pos.shape[1]
         assert pos.shape == (3,num_points)
         atorbs = np.zeros((num_points,self.num_atorbs))
@@ -372,6 +401,11 @@ class stowfn:
         return atorbs
 
     def get_norm(self):
+        """Compute normalization factors for atomic orbitals.
+
+        Returns:
+            numpy.ndarray: Norms of each AO (num_atorbs,).
+        """
         norm = np.zeros((self.num_atorbs,))
         stowfn_cpp.compute_norm(
             np.array(self.num_shells_on_centre, dtype=np.int32),
@@ -383,6 +417,16 @@ class stowfn:
         return norm
 
     def iter_atorbs(self):
+        """Iterator over atomic orbitals.
+
+        Yields:
+            tuple: (atorb, centre, nshell, N, pl)
+                - atorb: AO index
+                - centre: centre index
+                - nshell: shell index
+                - N: radial order
+                - pl: polynomial index within shell
+        """
         nshell = 0
         atorb = 0
         for centre in range(self.num_centres):
@@ -393,6 +437,11 @@ class stowfn:
                 nshell += 1
 
     def cusp_constraint_matrix(self):
+        """Construct the cusp condition constraint matrix.
+
+        Returns:
+            numpy.ndarray: Matrix of shape (num_centres, num_atorbs) imposing nuclear cusp conditions.
+        """
         norm = self.get_norm()
         res = np.asmatrix(np.zeros((self.num_centres,self.num_atorbs)))
         for core in range(self.num_centres):
@@ -409,6 +458,11 @@ class stowfn:
         return res
 
     def cusp_projection_matrix(self):
+        """Construct the projection matrix that enforces the cusp condition.
+
+        Returns:
+            numpy.ndarray: Projector matrix (num_atorbs, num_atorbs).
+        """
         #print "cusp_constraint: ",cusp_constraint
         _U,_S,Vh = np.linalg.svd(self.cusp_constraint_matrix(),full_matrices=False)
         #print "shapes U,S,Vh",U.shape,S.shape,Vh.shape
@@ -420,6 +474,11 @@ class stowfn:
         return Q
 
     def cusp_fixed_atorbs(self):
+        """Determine the atomic orbitals fixed by the cusp constraint.
+
+        Returns:
+            numpy.ndarray: Indices of cusp-fixed AOs (num_centres,).
+        """
         res = np.zeros(self.num_centres,int)
         for c in range(self.num_centres):
             cidx = np.zeros(self.num_shells)
@@ -429,11 +488,16 @@ class stowfn:
         return res
 
     def cusp_enforcing_matrix(self):
+        """Construct the linear transformation matrix that enforces cusp conditions.
+
+        Returns:
+            numpy.ndarray: Transformation matrix (num_atorbs, num_atorbs).
+        """
         cusp_fixed_atorb = self.cusp_fixed_atorbs()
         constraint = self.cusp_constraint_matrix()
         res = constraint + 0.0
         res[:,cusp_fixed_atorb] = 0.0
-        U,S,Vh = np.linalg.svd(constraint[:,cusp_fixed_atorb],full_matrices=False)
+        U, S, Vh = np.linalg.svd(constraint[:,cusp_fixed_atorb],full_matrices=False)
         tmpinv = Vh.T * np.asmatrix(np.diag(1/S)) * U.T
         res = -tmpinv * res
         mat = np.asmatrix(np.eye(self.num_atorbs))
@@ -445,7 +509,7 @@ if __name__ == "__main__":
     sto = stowfn("stowfn.data")
     sto.read_molorbmods("correlation.data")
     points = np.zeros((3,4))
-    points[:,0] = (-0.19450689,-0.94412413,-0.67370571)
+    points[:,0] = (-0.19450689, -0.94412413, -0.67370571)
     points[:,:] = points[:,:1]
     points[0,1] += 0.00317100
     points[1,2] += 0.00317100
