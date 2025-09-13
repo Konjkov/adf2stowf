@@ -157,10 +157,10 @@ void eval_atorbs(
             double r1 = std::sqrt(r2);
 
             // s and p-orbitals
-            poly[0] = 1.0;
-            poly[1] = x;
-            poly[2] = y;
-            poly[3] = z;
+            poly[0] = 1;  // (0,  0)
+            poly[1] = x;  // (1,  1)
+            poly[2] = y;  // (1, -1)
+            poly[3] = z;  // (1,  0)
 
             int max_sh_type = buf_max_sh(centre);
             if (max_sh_type >= 4) {
@@ -168,22 +168,22 @@ void eval_atorbs(
                 double xy = x*y;
                 double yz = y*z;
                 double zx = z*x;
-                poly[4] = xy;
-                poly[5] = yz;
-                poly[6] = zx;
-                poly[7] = 3*zz - r2;
-                poly[8] = xx - yy;
+                poly[4] = xy;         // (2, -2)
+                poly[5] = yz;         // (2, -1)
+                poly[6] = zx;         // (2,  1)
+                poly[7] = 3*zz - r2;  // (2,  0)
+                poly[8] = xx - yy;    // (2,  2)
 
                 if (max_sh_type >= 5) {
                     // f-orbitals
                     double t1 = 5*zz - r2;
-                    poly[9]  = (2*zz - 3*(xx + yy)) * z;
-                    poly[10] = t1 * x;
-                    poly[11] = t1 * y;
-                    poly[12] = (xx - yy) * z;
-                    poly[13] = xy * z;
-                    poly[14] = (xx - 3.0*yy) * x;
-                    poly[15] = (3.0*xx - yy) * y;
+                    poly[9]  = (2*zz - 3*(xx + yy)) * z;  // (3,  0)
+                    poly[10] = t1 * x;                    // (3,  1)
+                    poly[11] = t1 * y;                    // (3, -1)
+                    poly[12] = (xx - yy) * z;             // (3,  2)
+                    poly[13] = xy * z;                    // (3, -2)
+                    poly[14] = (xx - 3.0*yy) * x;         // (3, -3)
+                    poly[15] = (3.0*xx - yy) * y;         // (3,  3)
 
                     if (max_sh_type >= 6) {
                         // g-orbitals
@@ -196,15 +196,15 @@ void eval_atorbs(
                         double zz7_rr = zz7 - r2;
                         double zz7_rr3 = zz7 - rr3;
 
-                        poly[16] = zz5*(zz7_rr3) - (zz5 - r2)*rr3;
-                        poly[17] = zx * (zz7_rr3);
-                        poly[18] = yz * (zz7_rr3);
-                        poly[19] = (xx_yy) * (zz7_rr);
-                        poly[20] = xy * (zz7_rr);
-                        poly[21] = zx * (xx_yy3);
-                        poly[22] = yz * (xx3_yy);
-                        poly[23] = xx * (xx_yy3) - yy * (xx3_yy);
-                        poly[24] = xy * (xx_yy);
+                        poly[16] = zz5*(zz7_rr3) - (zz5 - r2)*rr3;   // (4,  0)
+                        poly[17] = zx * (zz7_rr3);                   // (4,  1)
+                        poly[18] = yz * (zz7_rr3);                   // (4, -1)
+                        poly[19] = (xx_yy) * (zz7_rr);               // (4,  2)
+                        poly[20] = xy * (zz7_rr);                    // (4, -2)
+                        poly[21] = zx * (xx_yy3);                    // (4,  3)
+                        poly[22] = yz * (xx3_yy);                    // (4, -3)
+                        poly[23] = xx * (xx_yy3) - yy * (xx3_yy);    // (4,  4)
+                        poly[24] = xy * (xx_yy);                     // (4, -4)
                     }
                 }
             }
@@ -475,17 +475,69 @@ void eval_molorb_derivs(
 
                     if (max_sh_type>=6) {
                         // g-orbitals
-                        poly[16] = xx*xx - 6*xx*yy + yy*yy;
-                        poly[17] = (xx-yy)*xy;
-                        poly[18] = (xx-yy)*z*z;
-                        poly[19] = xy*z*z;
-                        poly[20] = z*z*z*z - 3*(xx+yy)*z*z;
-                        poly[21] = (xx+yy-6*zz)*x*z;
-                        poly[22] = (xx+yy-6*zz)*y*z;
-                        poly[23] = (xx-3*yy)*xy;
-                        poly[24] = (3*xx-yy)*xy;
+                        double xx_yy3   = xx - 3*yy;
+                        double xx3_yy   = 3*xx - yy;
+                        double xx_yy    = xx - yy;
+                        double zz5      = 5*zz;
+                        double zz7      = 7*zz;
+                        double rr3      = 3*r2;
+                        double zz7_rr   = zz7 - r2;
+                        double zz7_rr3  = zz7 - rr3;
 
-                        // dpoly not implemented
+                        poly[16] = zz5*zz7_rr3 - (zz5 - r2)*rr3;
+                        poly[17] = (z*x) * zz7_rr3;
+                        poly[18] = (y*z) * zz7_rr3;
+                        poly[19] = xx_yy * zz7_rr;
+                        poly[20] = (x*y) * zz7_rr;
+                        poly[21] = (z*x) * xx_yy3;
+                        poly[22] = (y*z) * xx3_yy;
+                        poly[23] = xx*xx_yy3 - yy*xx3_yy;
+                        poly[24] = (x*y) * xx_yy;
+
+                        // poly[16] = 35zzzz-30zzrr+3rrrr
+                        dpoly[0][16] = -60*x*zz + 12*x*r2;
+                        dpoly[1][16] = -60*y*zz + 12*y*r2;
+                        dpoly[2][16] = 140*z*zz - 60*z*r2;
+
+                        // poly[17] = xz*(7zz-3rr)
+                        dpoly[0][17] = z*(7.0*zz - 3.0*r2) + x*(14.0*zz - 6.0*r2);
+                        dpoly[1][17] = -6.0*x*y*z;
+                        dpoly[2][17] = x*(21.0*zz - 3.0*r2);
+
+                        // poly[18] = yz*(7zz-3rr)
+                        dpoly[0][18] = -6.0*x*y*z;
+                        dpoly[1][18] = z*(7.0*zz - 3.0*r2) + y*(14.0*zz - 6.0*r2);
+                        dpoly[2][18] = y*(21.0*zz - 3.0*r2);
+
+                        // poly[19] = (xx-yy)*(7zz-rr)
+                        dpoly[0][19] = 2.0*x*(7.0*zz - r2) - 2.0*x*(xx - yy);
+                        dpoly[1][19] = -2.0*y*(7.0*zz - r2) - 2.0*y*(xx - yy);
+                        dpoly[2][19] = 14.0*z*(xx - yy);
+
+                        // poly[20] = xy*(7zz-rr)
+                        dpoly[0][20] = y*(7.0*zz - r2) - 2.0*x*x*y;
+                        dpoly[1][20] = x*(7.0*zz - r2) - 2.0*x*y*y;
+                        dpoly[2][20] = 14.0*x*y*z;
+
+                        // poly[21] = xz*(xx-3yy)
+                        dpoly[0][21] = 3.0*z*(xx - yy);
+                        dpoly[1][21] = -6.0*x*y*z;
+                        dpoly[2][21] = x*(xx - 3.0*yy);
+
+                        // poly[22] = yz*(3xx-yy)
+                        dpoly[0][22] = 6.0*x*y*z;
+                        dpoly[1][22] = z*(3.0*xx - yy);
+                        dpoly[2][22] = y*(3.0*xx - yy);
+
+                        // poly[23] = xxxx - 6xxyy + yyyy
+                        dpoly[0][23] = 4.0*x*(xx - 3.0*yy);
+                        dpoly[1][23] = 4.0*y*(yy - 3.0*xx);
+                        dpoly[2][23] = 0.0;
+
+                        // poly[24] = xxxy - xxyy
+                        dpoly[0][24] = y*(3.0*xx - yy);
+                        dpoly[1][24] = x*(xx - 3.0*yy);
+                        dpoly[2][24] = 0.0;
                     }
                 }
             }
