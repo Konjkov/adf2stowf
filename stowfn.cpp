@@ -566,15 +566,34 @@ void eval_molorb_derivs(
                     phi[pl]=phi_val; dphi[0][pl]=dpx; dphi[1][pl]=dpy; dphi[2][pl]=dpz; ddphi[pl]=dd;
                 }
 
-                for (int pl=0; pl<npoly; ++pl) {
-                    for (int mo=0; mo<num_molorbs; ++mo) {
-                        buf_val(pt,mo)+=buf_coeff(mo,n_atorb)*phi[pl];
-                        buf_grad(0,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[0][pl];
-                        buf_grad(1,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[1][pl];
-                        buf_grad(2,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[2][pl];
-                        buf_lap(pt,mo)+=buf_coeff(mo,n_atorb)*ddphi[pl];
+                if (N==0) {
+                    for (int pl=0; pl<npoly; ++pl) {
+                        for (int mo=0; mo<num_molorbs; ++mo) {
+                            buf_val(pt,mo)+=buf_coeff(mo,n_atorb)*phi[pl];
+                            buf_grad(0,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[0][pl];
+                            buf_grad(1,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[1][pl];
+                            buf_grad(2,pt,mo)+=buf_coeff(mo,n_atorb)*dphi[2][pl];
+                            buf_lap(pt,mo)+=buf_coeff(mo,n_atorb)*ddphi[pl];
+                        }
+                        ++n_atorb;
                     }
-                    ++n_atorb;
+                } else {
+                    for (int pl=0; pl<npoly; ++pl) {
+                        for (int mo=0; mo<num_molorbs; ++mo) {
+                            buf_val(pt,mo)+=buf_coeff(mo,n_atorb)*std::pow(r1,N)*phi[pl];
+                            buf_grad(0,pt,mo)+=buf_coeff(mo,n_atorb)*
+                                (N*x*std::pow(r1,N-2)*phi[pl] + std::pow(r1,N)*dphi[0][pl]);
+                            buf_grad(1,pt,mo)+=buf_coeff(mo,n_atorb)*
+                                (N*y*std::pow(r1,N-2)*phi[pl] + std::pow(r1,N)*dphi[1][pl]);
+                            buf_grad(2,pt,mo)+=buf_coeff(mo,n_atorb)*
+                                (N*z*std::pow(r1,N-2)*phi[pl] + std::pow(r1,N)*dphi[2][pl]);
+                            buf_lap(pt,mo)+=buf_coeff(mo,n_atorb)*
+                                (N*(N+1)*std::pow(r1,N-2)*phi[pl]
+                                +2*N*std::pow(r1,N-2)*(x*dphi[0][pl]+y*dphi[1][pl]+z*dphi[2][pl])
+                                +std::pow(r1,N)*ddphi[pl]);
+                        }
+                        ++n_atorb;
+                    }
                 }
             }
         }
