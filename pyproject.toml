@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = 'adf2stowf'
 version = '0.9.0'
-description = 'Cconverter from ADF to CASINO'
+description = 'Converter from ADF TAPE21.asc to CASINO stowfn.data'
 authors = [
     {name = "Vladmir Konkov", email = "Konjkov.VV@gmail.com"},
 ]
