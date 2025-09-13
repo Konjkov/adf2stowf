@@ -13,7 +13,7 @@ except ImportError:
 from numpy import *
 from numpy.linalg import inv
 try:
-    import adfread
+    from adf2stowf import adfread
 except ImportError:
     sys.exit('Could not find internal adfread library.')
 
@@ -511,7 +511,7 @@ norm_per_harmbasfn = concatenate(norm_per_centre)
 ############
 
 try:
-    import stowfn
+    from adf2stowf import stowfn
 except ImportError:
     sys.exit('Could not find internal stowfn library.')
 

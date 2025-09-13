@@ -41,7 +41,7 @@ def weave_inline(support_code,code,dict,defs=[]):
     try:
         import weave
     except ImportError:
-        print('This program requires the scipy library, which could not be')
+        print('This program requires the weave library, which could not be')
         print('found.')
         sys.exit()
     weave.inline(

@@ -6,7 +6,7 @@
 # it for personal use.
 
 
-from common import *
+from adf2stowf.common import *
 
 num_orbs_per_shelltype=numpy.array([0,1,4,3,5,7,9])
 
