@@ -22,7 +22,7 @@ classifiers = [
     'Programming Language :: Python',
     'Programming Language :: Python :: 3.9',
 ]
-requires-python = "~=3.9"
+requires-python = ">=3.9,<3.10"
 dependencies = [
     'numpy==1.24.4',
     'scipy-weave==0.19.0',
