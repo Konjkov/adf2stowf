@@ -10,8 +10,6 @@ ext_modules = [
 ]
 
 setup(
-    name="stowfn_cpp",
-    version="1.0.0",
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )

@@ -7,11 +7,7 @@
 
 import re
 import sys
-try:
-    import numpy as np
-except ImportError:
-    print('This program requires the numpy library, which could not be found.')
-    sys.exit()
+import numpy as np
 
 def floatX(x):
     x = re.sub("E*-","E-",x)

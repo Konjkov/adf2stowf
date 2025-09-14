@@ -17,12 +17,12 @@ Requirements
 The script has been verified to work with:
 
     Python 3.10+
-    NumPy 1.26.4
-    pybind 3.0.1
+    NumPy 1.26.4+
+    pybind 3.0.0+
 
 For optional plotting of the cusp constraints
 
-    Matplotlib 3.9.4
+    Matplotlib 3.9.0+
 
 
 Build instructions

@@ -1,19 +1,8 @@
 #!/usr/bin/env python3
 
-# (C) 2008 Norbert Nemec
-# This file is part of the CASINO distribution.
-# Permission is given to use the script along with the CASINO program and modify
-# it for personal use.
-
 import sys
-try:
-    import numpy as np
-except ImportError:
-    sys.exit('This program needs the numpy library, which could not be found.')
-try:
-    import adfread
-except ImportError:
-    sys.exit('Could not find internal adfread library.')
+import numpy as np
+from adf2stowf import adfread
 
 ############
 
@@ -523,10 +512,7 @@ norm_per_harmbasfn = np.concatenate(norm_per_centre)
 ############
 ############
 
-try:
-    import stowfn
-except ImportError:
-    sys.exit('Could not find internal stowfn library.')
+from adf2stowf import stowfn
 
 sto = stowfn.stowfn()
 
@@ -716,3 +702,7 @@ if PLOTCUSPS:
     # Adjust layout and save figure
     fig.tight_layout()
     fig.savefig('cusp_constraint.svg')
+
+
+def main():
+    """Entry point."""
