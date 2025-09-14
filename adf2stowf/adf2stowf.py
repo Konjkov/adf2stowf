@@ -11,7 +11,8 @@ PLOTCUSPS, CUSP_ENFORCE = cli_main.main()
 
 ############
 
-data = adfread.adfread()
+parser = adfread.AdfParser("TAPE21.asc")
+data = parser.parse()
 
 ############
 
