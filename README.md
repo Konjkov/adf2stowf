@@ -28,18 +28,16 @@ For optional plotting of the cusp constraints
 Build instructions
 ==================
 
-Then build the extension in place:
+To build the package from source, you must first install the required system dependencies. On Ubuntu/Debian-based systems, run:
 
-    cd path/to/adf2stowf
-    python3.9 setup.py build_ext --inplace
-
-This will create a shared library file, for example:
-
-    stowfn_norm.cpython-39-x86_64-linux-gnu.so
-
-in the same directory.
-The script `adf2stowf.py` will then be able to import it automatically.
-
+```bash
+sudo apt update
+sudo apt install \
+    python3-dev \
+    python3-distutils \
+    python3-venv \
+    build-essential \
+    cmake
 
 Usage
 =====
