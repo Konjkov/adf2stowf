@@ -3,11 +3,11 @@
 import sys
 import numpy as np
 from adf2stowf import adfread
+from adf2stowf import cli_main
 
 ############
 
-PLOTCUSPS = False
-CUSP_ENFORCE = True
+PLOTCUSPS, CUSP_ENFORCE = cli_main.main()
 
 ############
 
