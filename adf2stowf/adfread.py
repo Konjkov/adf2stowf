@@ -170,7 +170,7 @@ class AdfParser:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: adf_parser.py <file.asc>")
+        print("Usage: adfread.py <file.asc>")
         sys.exit(1)
 
     ascfname = Path(sys.argv[1])
