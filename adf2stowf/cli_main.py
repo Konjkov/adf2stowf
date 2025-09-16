@@ -10,6 +10,7 @@ def main():
           %(prog)s --plot-cusps            # set PLOTCUSPS=True
           %(prog)s --no-cusp-enforce       # set CUSP_ENFORCE=False
           %(prog)s --plot-cusps --no-cusp-enforce
+          %(prog)s --dump                  # generate a text dump of the parsed data
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -27,5 +28,11 @@ def main():
         help='Disable cusp enforcement (default: True)'
     )
 
+    parser.add_argument(
+        '--dump',
+        action='store_true',
+        help='Generate a text dump file (.txt) of the parsed ADF data (default: False)'
+    )
+
     args = parser.parse_args()
-    return args.plot_cusps, args.cusp_enforce
+    return args.plot_cusps, args.cusp_enforce, args.dump

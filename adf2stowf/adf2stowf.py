@@ -7,12 +7,14 @@ from adf2stowf import cli_main
 
 ############
 
-PLOTCUSPS, CUSP_ENFORCE = cli_main.main()
+PLOTCUSPS, CUSP_ENFORCE, DO_DUMP = cli_main.main()
 
 ############
 
-parser = adfread.AdfParser("TAPE21.asc")
+parser = adfread.AdfParser('TAPE21.asc')
 data = parser.parse()
+if DO_DUMP:
+    parser.write_dump('TAPE21.txt')
 
 ############
 

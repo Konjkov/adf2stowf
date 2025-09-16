@@ -50,7 +50,7 @@ class AdfParser:
         values: List[int] = []
         i = start
         while len(values) < count:
-            values.extend(self._int_x(s) for s in self._split_n(self.lines[i][:-1], INT_FIELD_WIDTH))
+            values.extend(self._int_x(s) for s in self._split_n(self.lines[i], INT_FIELD_WIDTH))
             i += 1
         return np.array(values, int), i
 
@@ -58,7 +58,7 @@ class AdfParser:
         values: List[float] = []
         i = start
         while len(values) < count:
-            values.extend(self._float_x(s) for s in self._split_n(self.lines[i][:-1], FLOAT_FIELD_WIDTH))
+            values.extend(self._float_x(s) for s in self._split_n(self.lines[i], FLOAT_FIELD_WIDTH))
             i += 1
         return np.array(values, float), i
 
@@ -66,7 +66,7 @@ class AdfParser:
         raw = ""
         i = start
         while len(raw) < count:
-            raw += self.lines[i][:-1]
+            raw += self.lines[i]
             i += 1
         values = [
             raw[STRING_BLOCK_SIZE * j: STRING_BLOCK_SIZE * (j + 1)].strip()
@@ -78,7 +78,7 @@ class AdfParser:
         values: List[bool] = []
         i = start
         while len(values) < count:
-            values.extend({"T": True, "F": False}[c] for c in self.lines[i][:-1])
+            values.extend({"T": True, "F": False}[c] for c in self.lines[i])
             i += 1
         return values, i
 
@@ -101,7 +101,7 @@ class AdfParser:
         """Read file contents into memory."""
         try:
             with open(self.filename, encoding="latin-1") as f:
-                self.lines = f.readlines()
+                self.lines = f.read().splitlines()
         except (FileNotFoundError, IsADirectoryError):
             print(f"File {self.filename} could not be read.")
             sys.exit(1)
@@ -113,7 +113,6 @@ class AdfParser:
 
         i = 0
         self.data = {}
-        last_group = ""
 
         try:
             while i < len(self.lines):
@@ -122,7 +121,7 @@ class AdfParser:
                 key = self.lines[i].strip()
                 i += 1
 
-                len1, len2, typ = map(int, self.lines[i][:-1].split())
+                len1, len2, typ = map(int, self.lines[i].split())
                 i += 1
 
                 value, i = self._parse_value(typ, i, len2)
@@ -136,7 +135,7 @@ class AdfParser:
             print("Parsing error around:")
             for x in range(max(0, i - 3), min(i + 4, len(self.lines))):
                 marker = ">>>>" if x == i else "   |"
-                print(f"{marker}{self.lines[x][:-1]}")
+                print(f"{marker}{self.lines[x]}")
             raise
 
         return self.data
@@ -149,15 +148,15 @@ class AdfParser:
         if not self.data:
             self.parse()
 
-        with open(outfile, "w", encoding="latin-1") as f:
-            last_group = ""
+        with open(outfile, 'w', encoding='latin-1') as f:
+            last_group = ''
             for group, keys in self.data.items():
                 if group != last_group:
-                    f.write(f"\n{group}\n")
+                    f.write(f'\n{group}\n')
                     last_group = group
                 for key, value in keys.items():
-                    tab = "\t"
-                    newline = "\n"
+                    tab = '\t'
+                    newline = '\n'
                     valstr = str(value)
                     if newline in valstr:
                         f.write(
@@ -165,7 +164,7 @@ class AdfParser:
                             f"{valstr.replace(chr(10), chr(10) + tab)}\n"
                         )
                     else:
-                        f.write(f"  {key} = {valstr}\n")
+                        f.write(f'  {key} = {valstr}\n')
 
 
 if __name__ == "__main__":
