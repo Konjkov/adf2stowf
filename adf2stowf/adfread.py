@@ -11,7 +11,7 @@ import numpy as np
 # Constants for formatting
 INT_FIELD_WIDTH = 12
 FLOAT_FIELD_WIDTH = 28
-STRING_BLOCK_SIZE = 1600
+STRING_BLOCK_SIZE = 160
 
 
 class AdfParser:
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 
     ascfname = Path(sys.argv[1])
     if ascfname.suffix != ".asc":
-        print("Error: input file must end with .asc")
+        print('Error: input file must end with .asc')
         sys.exit(1)
 
     parser = AdfParser(ascfname)

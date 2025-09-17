@@ -41,3 +41,8 @@ adf2stowf = "adf2stowf.adf2stowf:main"
 src = ["adf2stowf"]
 line-length = 150
 respect-gitignore = true
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "auto"
+quote-style = "single"

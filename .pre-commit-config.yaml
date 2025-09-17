@@ -9,3 +9,13 @@ repos:
       - id: end-of-file-fixer
         name: Fix end of files
       - id: check-ast
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.6.8
+    hooks:
+      - id: ruff
+        name: lint with ruff
+      - id: ruff
+        name: sort imports with ruff
+        args: [--select, I, --fix]
+      - id: ruff-format
+        name: format with ruff
