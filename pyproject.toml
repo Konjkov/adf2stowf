@@ -42,6 +42,11 @@ src = ["adf2stowf"]
 line-length = 150
 respect-gitignore = true
 
+[tool.ruff.lint]
+ignore = [
+    "E741"  # ambiguous-variable-name
+]
+
 [tool.ruff.format]
 indent-style = "space"
 line-ending = "auto"
