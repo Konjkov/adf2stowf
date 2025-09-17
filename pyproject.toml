@@ -36,3 +36,8 @@ packages = ['adf2stowf']
 
 [project.scripts]
 adf2stowf = "adf2stowf.adf2stowf:main"
+
+[tool.ruff]
+src = ["adf2stowf"]
+line-length = 150
+respect-gitignore = true
