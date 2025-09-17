@@ -11,7 +11,7 @@ import numpy as np
 # Constants for formatting
 INT_FIELD_WIDTH = 12
 FLOAT_FIELD_WIDTH = 28
-STRING_BLOCK_SIZE = 160
+STRING_BLOCK_SIZE = 1600
 
 
 class AdfParser:
