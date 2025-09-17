@@ -28,15 +28,15 @@ Symmetry = data['Symmetry']
 
 ############
 
-(Nspins,) = General['nspin']
+Nspins = General['nspin'][0]
 spin_restricted = Nspins == 1
 
 Nvalence_electrons = int(General['electrons'][0])
 
-(Natoms,) = Geometry['nnuc']
-(Natomtypes,) = Geometry['ntyp']
-(Ndummies,) = Geometry['nr of dummy atoms']
-(Ndummytypes,) = Geometry['nr of dummy atomtypes']
+Natoms = Geometry['nnuc'][0]
+Natomtypes = Geometry['ntyp'][0]
+Ndummies = Geometry['nr of dummy atoms'][0]
+Ndummytypes = Geometry['nr of dummy atomtypes'][0]
 
 assert Geometry['nr of atoms'] == Natoms + Ndummies
 assert Geometry['nr of atomtypes'] == Natomtypes + Ndummytypes
@@ -114,8 +114,8 @@ cart2harm_per_shelltype = [np.linalg.inv(m) for m in harm2cart_per_shelltype]
 # Valence basis set #
 #####################
 
-(nbset,) = Basis['nbset']
-(nbos,) = Basis['nbos']
+nbset = Basis['nbset'][0]
+nbos = Basis['nbos'][0]
 nbaspt = Basis['nbaspt'] - 1
 assert nbaspt[0] == 0
 assert nbaspt[-1] == nbset
@@ -172,7 +172,7 @@ valence_cartnorm_per_atomtype = [valence_cartnorm[nbptr[a] : nbptr[a + 1]] for a
 # Core basis set
 #################
 
-(ncset,) = Core['ncset']
+ncset = Core['ncset'][0]
 ncorpt = Core['ncorpt'] - 1
 assert ncorpt[0] == 0
 assert ncorpt[-1] == ncset
@@ -551,7 +551,7 @@ if False:
     print(norm_per_harmbasfn)
     print('Norm-computed (minimal basis)')
     print(sto.get_norm())
-# print(norm_per_harmbasfn - sto.get_norm())
+    # print(norm_per_harmbasfn - sto.get_norm())
 
 np.set_printoptions(suppress=True)
 
