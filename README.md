@@ -35,6 +35,9 @@ sudo apt install \
     python3-venv \
     build-essential \
     cmake
+```
+
+or just `pip install adf2stowf`
 
 Usage
 =====
