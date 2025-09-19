@@ -561,7 +561,7 @@ fixed = [np.zeros(Nmolorbs[sp], bool) for sp in range(Nspins)]
 for sp in range(Nspins):
     for i in range(Nmolorbs[sp]):
         constraint_violation = cusp_constraint @ coeff[sp][:, i]
-        if any(abs(constraint_violation) > 1e-9):
+        if np.any(np.abs(constraint_violation) > 1e-9):
             fixed[sp][i] = True
             print('spin #%i, orb #%i - constraint violation by:' % (sp, i), constraint_violation)
             if CUSP_ENFORCE:
@@ -575,7 +575,7 @@ for sp in range(Nspins):
                 coeff[sp][:, i] = enforced_coeff
 
                 constraint_violation = cusp_constraint @ coeff[sp][:, i]
-                assert all(abs(constraint_violation) < 1e-8)
+                assert np.all(np.abs(constraint_violation) < 1e-8)
         #    print("    after enforcing        :",dot(cusp_constraint,enforced_coeff))
 
 if PLOTCUSPS:
