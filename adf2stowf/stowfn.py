@@ -10,12 +10,10 @@ import sys
 
 import numpy as np
 
-num_orbs_per_shelltype = np.array([0, 1, 4, 3, 5, 7, 9])
-
-pi = np.pi
-
 F2P_bool = {'.false.': False, '.true.': True}
 P2F_bool = {False: '.false.', True: '.true.'}
+
+num_orbs_per_shelltype = np.array([0, 1, 4, 3, 5, 7, 9])
 
 
 def mapunion(a, b):

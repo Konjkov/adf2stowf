@@ -22,7 +22,7 @@ The script has been verified to work with:
 
 For optional plotting of the cusp constraints
 
-    Matplotlib 3.9+
+    Matplotlib >=3.9.0
 
 
 Usage
@@ -59,4 +59,3 @@ or
     adf2stowf --no-cusp-enforce
 or
     adf2stowf --dump
-
