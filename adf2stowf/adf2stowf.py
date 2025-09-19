@@ -10,12 +10,11 @@ import sys
 import numpy as np
 from numpy.linalg import inv
 
-from adf2stowf import adfread, stowfn
+from adf2stowf import adfread, cli_main, stowfn
 
 ############
 
-PLOTCUSPS = False
-CUSP_ENFORCE = True
+PLOTCUSPS, CUSP_ENFORCE, DO_DUMP = cli_main.main()
 
 ############
 
@@ -603,39 +602,68 @@ sto.writefile('stowfn.data')
 
 if PLOTCUSPS:
     try:
-        import pylab
+        import matplotlib.pyplot as plt
     except ImportError:
-        print('The PLOTCUSPS feature requires the pylab library, which could')
+        print('The PLOTCUSPS feature requires the matplotlib library, which could not be found.')
         print('not be found.')
         sys.exit()
     Natom = sto.num_atom
-    axval = [pylab.subplot(2, Natom, at + 1) for at in range(Natom)]
-    axeloc = [pylab.subplot(2, Natom, Natom + at + 1) for at in range(Natom)]
+    # Create a 2 x Natom grid of subplots
+    # Top row: wavefunction values (val)
+    # Bottom row: local energies (eloc)
+    fig, axes = plt.subplots(2, Natom, figsize=(4 * Natom, 4))
+    # If only one atom, reshape axes into 2D array for consistency
+    if Natom == 1:
+        axes = np.array([axes]).reshape(2, 1)
+    axval = [axes[0, at] for at in range(Natom)]
+    axeloc = [axes[1, at] for at in range(Natom)]
     for at in range(Natom):
         eloc_min = 1e8
         eloc_max = -1e8
         for sp in range(Nspins):
             for i in range(sum(fixed[sp])):
-                vpre = val_pre[at][sp][:, i]
-                vpost = val_post[at][sp][:, i]
-                sgn = np.sign(vpre[len(vpre) // 2])
-                print(at, sp, i)
+                vpre = val_pre[at][sp][:, i]  # wavefunction before correction
+                vpost = val_post[at][sp][:, i]  # wavefunction after correction
+                sgn = np.sign(vpre[len(vpre) // 2])  # sign normalization
+                # Plot wavefunction before and after correction
                 (pl,) = axval[at].plot(z, sgn * vpre, '--')
                 axval[at].plot(z, sgn * vpost, color=pl.get_color())
-                #      pl, = axeloc[at].plot(z,lap_pre[at][sp][:,i]+sto.atomnum[at]/z,'--')
-                eloc_pre = -0.5 * lap_pre[at][sp][:, i] / val_pre[at][sp][:, i] - sto.atomnum[at] / abs(z)
-                eloc_post = -0.5 * lap_post[at][sp][:, i] / val_post[at][sp][:, i] - sto.atomnum[at] / abs(z)
+                # Plot Laplacian of the wavefunction + Coulomb term (without normalization).
+                # pl, = axeloc[at].plot(z, lap_pre[at][sp][:,i] + sto.atomnum[at]/z, '--')
+                # Compute local energy before and after correction:
+                # E_loc = -0.5 * (Laplacian / wavefunction) - Z / |r|
+                eloc_pre = -0.5 * lap_pre[at][sp][:, i] / val_pre[at][sp][:, i] - sto.atomnum[at] / np.abs(z)
+                eloc_post = -0.5 * lap_post[at][sp][:, i] / val_post[at][sp][:, i] - sto.atomnum[at] / np.abs(z)
+                # Plot local energy before and after correction
                 axeloc[at].plot(z, eloc_pre, '--', color=pl.get_color())
                 axeloc[at].plot(z, eloc_post, '-', color=pl.get_color())
-                eloc_min = min(eloc_min, eloc_post[0], eloc_post[-1], eloc_post[len(eloc_post) // 2 - 1], eloc_post[len(eloc_post) // 2 + 1])
-                eloc_max = max(eloc_min, eloc_post[0], eloc_post[-1], eloc_post[len(eloc_post) // 2 - 1], eloc_post[len(eloc_post) // 2 + 1])
-
-        eloc_mid = 0.5 * (eloc_min + eloc_max)
+                # Track min/max values for axis scaling
+                eloc_min = min(
+                    eloc_min,
+                    eloc_post[0],
+                    eloc_post[-1],
+                    eloc_post[len(eloc_post) // 2 - 1],
+                    eloc_post[len(eloc_post) // 2 + 1],
+                )
+                eloc_max = max(
+                    eloc_min,
+                    eloc_post[0],
+                    eloc_post[-1],
+                    eloc_post[len(eloc_post) // 2 - 1],
+                    eloc_post[len(eloc_post) // 2 + 1],
+                )
+        # Expand y-limits around the middle value for better visualization
+        eloc_mid = (eloc_min + eloc_max) / 2
         eloc_min = (eloc_min - eloc_mid) * 1.5 + eloc_mid
         eloc_max = (eloc_max - eloc_mid) * 1.5 + eloc_mid
+        # Set axis ranges
         axval[at].set_xlim(z[0], z[-1])
         axeloc[at].set_xlim(z[0], z[-1])
         axeloc[at].set_ylim(eloc_min, eloc_max)
+    # Adjust layout and save figure
+    fig.tight_layout()
+    fig.savefig('cusp_constraint.svg')
 
-    pylab.gcf().set_size_inches(4, 4)
-    pylab.savefig('cusp_constraint.svg')
+
+def main():
+    """Entry point."""

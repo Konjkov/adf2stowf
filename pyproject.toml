@@ -19,7 +19,6 @@ classifiers = [
     'Intended Audience :: Science/Research',
     'Operating System :: POSIX :: Linux',
     'Topic :: Scientific/Engineering :: Chemistry',
-    'Programming Language :: Python',
     'Programming Language :: Python :: 3.9',
 ]
 requires-python = ">=3.9,<3.10"
@@ -35,7 +34,7 @@ repository = 'https://github.com/Konjkov/adf2stowf/tree/original'
 packages = ['adf2stowf']
 
 [project.scripts]
-adf2stowf = "adf2stowf.main:cli_main"
+adf2stowf = "adf2stowf.adf2stowf:main"
 
 [tool.ruff]
 src = ["adf2stowf"]
