@@ -48,3 +48,15 @@ This file can be used by CASINO setting the option
     atom_basis_type   : slater-type
 
 in the CASINO input file.
+
+The following command-line options are supported:
+`--plot-cusps` — enables plotting of cusps (default: disabled);
+`--no-cusp-enforce` — disables enforcement of cusp conditions at nuclei (default: enforced).
+`--dump` — generate a text dump of TAPE21.asc (default: no dump).
+For example:
+    adf2stowf --plot-cusps
+or
+    adf2stowf --no-cusp-enforce
+or
+    adf2stowf --dump
+
