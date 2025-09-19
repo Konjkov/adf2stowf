@@ -48,15 +48,15 @@ assert Geometry['nr of atomtypes'] == Natomtypes + Ndummytypes
 
 atyp_idx = Geometry['fragment and atomtype index'].reshape(2, Natoms + Ndummies)[1, :] - 1
 assert len(atyp_idx) == Natoms + Ndummies
-assert all(0 <= atyp_idx[0:Natoms])
-assert all(atyp_idx[0:Natoms] < Natomtypes)
-assert all(Natomtypes <= atyp_idx[Natoms : Natoms + Ndummies])
-assert all(atyp_idx[Natoms : Natoms + Ndummies] < Natomtypes + Ndummytypes)
+assert np.all(0 <= atyp_idx[0:Natoms])
+assert np.all(atyp_idx[0:Natoms] < Natomtypes)
+assert np.all(Natomtypes <= atyp_idx[Natoms : Natoms + Ndummies])
+assert np.all(atyp_idx[Natoms : Natoms + Ndummies] < Natomtypes + Ndummytypes)
 atyp_idx = atyp_idx[:Natoms]
 
 total_charge_per_atomtype = Geometry['atomtype total charge']
 atomicnumber_per_atomtype = np.array([int(c) for c in total_charge_per_atomtype])
-assert all(atomicnumber_per_atomtype[Natomtypes:] == 0)
+assert np.all(atomicnumber_per_atomtype[Natomtypes:] == 0)
 
 #####################
 #####################
@@ -126,7 +126,7 @@ assert nbaspt[0] == 0
 assert nbaspt[-1] == nbset
 
 Nvalence_shells_per_atomtype = nbaspt[1:] - nbaspt[:-1]
-assert all(Nvalence_shells_per_atomtype >= 0)
+assert np.all(Nvalence_shells_per_atomtype >= 0)
 
 Nvalence_shells_per_centre = Nvalence_shells_per_atomtype[atyp_idx]
 
@@ -160,10 +160,10 @@ assert nbptr[0] == 0
 assert nbptr[-1] == nbos
 
 Nvalence_cartbasfn_per_atomtype = nbptr[1:] - nbptr[:-1]
-assert all(Nvalence_cartbasfn_per_atomtype >= 0)
+assert np.all(Nvalence_cartbasfn_per_atomtype >= 0)
 
 Nvalence_cartbasfn_per_centre = Nvalence_cartbasfn_per_atomtype[atyp_idx]
-assert sum(Nvalence_cartbasfn_per_centre) == Basis['naos']
+assert np.sum(Nvalence_cartbasfn_per_centre) == Basis['naos']
 
 #############
 
@@ -183,12 +183,12 @@ assert ncorpt[0] == 0
 assert ncorpt[-1] == ncset
 
 Ncore_shells_per_atomtype = ncorpt[1:] - ncorpt[:-1]
-assert all(Ncore_shells_per_atomtype >= 0)
+assert np.all(Ncore_shells_per_atomtype >= 0)
 
 Ncore_shells_per_centre = Ncore_shells_per_atomtype[atyp_idx]
 
 nrcset = Core['nrcset'].reshape(Natomtypes, 4)
-assert all(Ncore_shells_per_atomtype == nrcset.sum(axis=1))
+assert np.all(Ncore_shells_per_atomtype == nrcset.sum(axis=1))
 assert ncset == nrcset.sum()
 
 ############
@@ -248,10 +248,10 @@ for c in range(Natoms):
 ###############
 
 Nharmbasfns_per_centre = [Nharmpoly_per_shelltype[st].sum() for st in shelltype_per_centre]
-Nharmbasfns = sum(Nharmbasfns_per_centre)
+Nharmbasfns = np.sum(Nharmbasfns_per_centre)
 
-assert all(Nvalence_cartbasfn_per_centre == np.array([Ncartpoly_per_shelltype[st].sum() for st in valence_shelltype_per_centre]))
-Nvalence_cartbasfn = sum(Nvalence_cartbasfn_per_centre)
+assert np.all(Nvalence_cartbasfn_per_centre == np.array([Ncartpoly_per_shelltype[st].sum() for st in valence_shelltype_per_centre]))
+Nvalence_cartbasfn = np.sum(Nvalence_cartbasfn_per_centre)
 
 ####################
 # valence orbitals #
@@ -265,6 +265,15 @@ assert len(norb) == nsym
 
 
 def select_coeff(sp):
+    """Select valence molecular orbital coefficients for a given spin channel.
+
+    Args:
+       sp (int): Spin index (0 for alpha, 1 for beta)
+
+    Returns:
+       valence_molorb_cart_coeff (np.ndarray): Array of shape (n_orbs, n_basis),
+           containing the selected valence orbital coefficients in Cartesian basis.
+    """
     X = ['A', 'B'][sp]
 
     valence_molorb_cart_coeff = []
@@ -282,7 +291,7 @@ def select_coeff(sp):
         froc_X = Section['froc_' + X]
         assert len(froc_X) == norb[sym]
 
-        if all(froc_X == 0.0):
+        if np.all(froc_X == 0.0):
             continue
 
         npart = Section['npart'] - 1
@@ -314,15 +323,20 @@ def select_coeff(sp):
     for k, v in iter(partial_occupations.items()):
         print('spin=', sp, ': leftover partial occupation at E=', k, ': ', v)
 
-    assert sum(len(p) for p in partial_occupations) == 0
+    assert np.sum(len(p) for p in partial_occupations) == 0
 
     # Nmolorbs_total = len(valence_molorb_eigenvalue)
     Nmolorbs_occup = len(valence_molorb_cart_coeff)
 
-    assert sum(valence_molorb_occupation) == Nmolorbs_occup
+    assert np.sum(valence_molorb_occupation) == Nmolorbs_occup
 
     valence_molorb_occupation = np.array(valence_molorb_occupation)
     valence_molorb_eigenvalue = np.array(valence_molorb_eigenvalue)
+    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
+
+    # Ensure 2D shape even if only one orbital exists (e.g., hydrogen)
+    if valence_molorb_cart_coeff.ndim == 1:
+        valence_molorb_cart_coeff = valence_molorb_cart_coeff.reshape(1, -1)
 
     occupied = valence_molorb_occupation[:] == 1
     occidx = valence_molorb_eigenvalue[occupied]
@@ -335,8 +349,6 @@ def select_coeff(sp):
             print('Warning: HOMO > LUMO (may happen in some cases)')
 
     valence_molorb_eigenvalue = valence_molorb_eigenvalue[occupied]
-    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
-
     assert len(valence_molorb_eigenvalue) == Nmolorbs_occup
 
     order = valence_molorb_eigenvalue.argsort()
@@ -348,7 +360,7 @@ def select_coeff(sp):
 valence_molorb_cart_coeff = [select_coeff(sp) for sp in range(Nspins)]
 Nvalence_molorbs = np.array([c.shape[0] for c in valence_molorb_cart_coeff])
 
-assert sum(Nvalence_molorbs) * (3 - Nspins) == Nvalence_electrons
+assert np.sum(Nvalence_molorbs) * (3 - Nspins) == Nvalence_electrons
 
 ##############################
 
@@ -425,8 +437,8 @@ molorb = 0
 
 for a in range(Natoms):
     at = atyp_idx[a]
-    first_harmbasfn = sum(Nharmbasfns_per_centre[:a])
-    Ncore_harmbasfns = sum(Nharmpoly_per_shelltype[st].sum() for st in core_shelltype_per_atomtype[at])
+    first_harmbasfn = np.sum(Nharmbasfns_per_centre[:a])
+    Ncore_harmbasfns = np.sum(Nharmpoly_per_shelltype[st].sum() for st in core_shelltype_per_atomtype[at])
     core_coeff = np.zeros([Ncore_harmbasfns])
     ccor_per_shell = np.array_split(ccor_per_atomtype[at], np.cumsum((nrcset * nrcorb)[at, :]))[:-1]
 
@@ -519,7 +531,7 @@ sto.atomnum = atomicnumber_per_atomtype[atyp_idx]
 
 sto.num_centres = int(Natoms)
 sto.centrepos = Geometry['xyz'].reshape(Natoms + Ndummies, 3)[:Natoms, :]
-sto.num_shells = sum(Nshells_per_centre)
+sto.num_shells = np.sum(Nshells_per_centre)
 
 sto.idx_first_shell_on_centre = np.array([0] + list(np.cumsum(Nshells_per_centre)))
 
@@ -545,7 +557,7 @@ if False:
 
 np.set_printoptions(suppress=True)
 
-# assert all(abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+# assert np.all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 cusp_fixed_atorbs = sto.cusp_fixed_atorbs()
 cusp_constraint = sto.cusp_constraint_matrix()
@@ -598,7 +610,7 @@ if PLOTCUSPS:
 if CUSP_ENFORCE:
     print('Molorb values at nuclei after applying cusp constraint:')
     print(sto.eval_molorbs(sto.atompos.transpose()))
-    # assert all(abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
+    # assert np.all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 sto.writefile('stowfn.data')
 
@@ -623,7 +635,7 @@ if PLOTCUSPS:
         eloc_min = 1e8
         eloc_max = -1e8
         for sp in range(Nspins):
-            for i in range(sum(fixed[sp])):
+            for i in range(np.sum(fixed[sp])):
                 vpre = val_pre[at][sp][:, i]  # wavefunction before correction
                 vpost = val_post[at][sp][:, i]  # wavefunction after correction
                 sgn = np.sign(vpre[len(vpre) // 2])  # sign normalization
