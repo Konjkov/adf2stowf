@@ -8,7 +8,6 @@
 import sys
 
 import numpy as np
-from numpy.linalg import inv
 
 from adf2stowf import adfread, cli_main, stowfn
 
@@ -114,7 +113,7 @@ harm2cart_per_shelltype = [
     ),
 ]
 
-cart2harm_per_shelltype = [inv(m) for m in harm2cart_per_shelltype]
+cart2harm_per_shelltype = [np.linalg.inv(m) for m in harm2cart_per_shelltype]
 
 #####################
 # Valence basis set #
