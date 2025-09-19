@@ -8,11 +8,7 @@
 import re
 import sys
 
-try:
-    import numpy
-except ImportError:
-    print('This program requires the numpy library, which could not be found.')
-    sys.exit()
+import numpy as np
 
 
 def floatX(x):
@@ -60,14 +56,14 @@ def adfread(infname='TAPE21.asc', outfile=None):
                     value += [intX(s) for s in splitN(lines[i][:-1], 12)]
                     i += 1
                 assert len(value) == len2
-                value = numpy.array(value, int)
+                value = np.array(value, int)
             elif typ == 2:  # float
                 value = []
                 while len(value) < len2:
                     value += [floatX(s) for s in splitN(lines[i][:-1], 28)]
                     i += 1
                 assert len(value) == len2
-                value = numpy.array(value, float)
+                value = np.array(value, float)
             elif typ == 3:  # string
                 value = ''
                 while len(value) < len2:
@@ -118,5 +114,5 @@ def adfread(infname='TAPE21.asc', outfile=None):
 if __name__ == '__main__':
     ascfname = sys.argv[1]
     assert ascfname[-4:] == '.asc'
-    #    numpy.set_printoptions(threshold=10)
+    #    np.set_printoptions(threshold=10)
     data = adfread(infname=ascfname, outfile=open(ascfname[:-4] + '.out', 'w', encoding='latin-1'))
