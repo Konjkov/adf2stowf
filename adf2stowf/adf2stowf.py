@@ -410,7 +410,7 @@ for sp in range(Nspins):
         valence_molorb_harm_coeff[sp][:, m] = cart2harm_matrix @ valence_molorb_cart_coeff[sp][m, :]
         if len(cart2harm_constraint) > 0:
             violation = cart2harm_constraint @ valence_molorb_cart_coeff[sp][m, :]
-            absviolation = np.sqrt(sum(abs(violation**2)))
+            absviolation = np.sqrt(np.sum(np.abs(violation**2)))
             if absviolation > 1e-5:
                 print('WARNING: cartesian to harmonic conversion: spin #%i, orb #%i ' 'violated by %g' % (sp, m, absviolation))
 
