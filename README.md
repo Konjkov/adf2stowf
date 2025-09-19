@@ -29,12 +29,9 @@ To build the package from source, you must first install the required system dep
 
 ```bash
 sudo apt update
-sudo apt install \
-    python3-dev \
-    python3-distutils \
-    python3-venv \
-    build-essential \
-    cmake
+sudo apt install python3-dev python3-distutils python3-venv build-essential cmake
+cd source-dir
+pip install .
 ```
 
 or just `pip install adf2stowf`
