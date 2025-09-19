@@ -18,7 +18,10 @@ PLOTCUSPS, CUSP_ENFORCE, DO_DUMP = cli_main.main()
 
 ############
 
-data = adfread.adfread()
+parser = adfread.AdfParser('TAPE21.asc')
+data = parser.parse()
+if DO_DUMP:
+    parser.write_dump('TAPE21.txt')
 
 ############
 
