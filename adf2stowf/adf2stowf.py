@@ -11,7 +11,12 @@ import numpy as np
 
 from adf2stowf import adfread, cli_main, stowfn
 
-np.set_printoptions(suppress=True)
+np.set_printoptions(
+    suppress=True,
+    precision=8,
+    floatmode='fixed',
+    sign=' ',
+)
 
 ############
 
@@ -406,8 +411,30 @@ for c in range(Natoms):
 assert i == Nharmbasfns
 assert j == Nvalence_cartbasfn
 
-if len(cart2harm_constraint) > 0:
-    cart2harm_constraint = np.concatenate(cart2harm_constraint, axis=0)
+# if len(cart2harm_constraint) > 0:
+#     cart2harm_constraint = np.concatenate(cart2harm_constraint, axis=0)
+#     # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
+#     A = cart2harm_constraint  # shape: (K, Ncart)
+#     # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
+#     from scipy.linalg import null_space
+#     # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
+#     Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
+#     P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
+#     # Apply projection to each molecular orbital
+#     for sp in range(Nspins):
+#         for m in range(Nvalence_molorbs[sp]):
+#             # Original Cartesian orbital coefficient vector
+#             C = valence_molorb_cart_coeff[sp][m, :].copy()
+#             # Project onto pure spherical harmonic subspace
+#             C_proj = P @ C
+#             # Overwrite with projected coefficients
+#             valence_molorb_cart_coeff[sp][m, :] = C_proj
+#
+#             # Verify constraint satisfaction: should be numerically zero
+#             violation = A @ C_proj
+#             absviolation = np.linalg.norm(violation)
+#             if absviolation > 1e-10:
+#                 print(f"WARNING: Projection failed for spin {sp}, orb {m}: {absviolation}")
 
 valence_molorb_harm_coeff = [np.zeros((Nharmbasfns, Nvalence_molorbs[sp])) for sp in range(Nspins)]
 
@@ -418,7 +445,7 @@ for sp in range(Nspins):
             violation = cart2harm_constraint @ valence_molorb_cart_coeff[sp][m, :]
             absviolation = np.sqrt(np.sum(np.abs(violation**2)))
             if absviolation > 1e-5:
-                print('WARNING: cartesian to harmonic conversion: spin #%i, orb #%i ' 'violated by %g' % (sp, m, absviolation))
+                print(f'WARNING: cartesian to sperical conversion for spin {sp}, orb {m} violated by {absviolation}')
 
 
 #######################
@@ -546,9 +573,9 @@ sto.zeta = np.concatenate(zeta_per_centre)
 
 sto.num_atorbs = Nharmbasfns
 sto.num_molorbs = Nmolorbs
-sto.coeff = [c.T for c in coeff]
 sto.footer = ''
 
+sto.coeff = [c.T for c in coeff]
 sto.check_and_normalize()
 
 # check norm
@@ -569,7 +596,7 @@ cusp_projection = sto.cusp_projection_matrix()
 cusp_enforcing = sto.cusp_enforcing_matrix()
 
 print('Molorb values at nuclei before applying cusp constraint:')
-print(sto.eval_molorbs(sto.atompos.transpose()))
+print(sto.eval_molorbs(sto.atompos.T))
 # Initialize a list of boolean masks, one per spin channel.
 # Each mask has length equal to the number of molecular orbitals (Nmolorbs[sp]) for that spin.
 # Initially, all values are False (no violations detected yet).
@@ -583,22 +610,22 @@ for sp in range(Nspins):
         # we mark this orbital as "fixed" (problematic) and handle it.
         if np.any(np.abs(constraint_violation) > 1e-9):
             fixed[sp][i] = True
-            print('spin #%i, orb #%i - constraint violation by:' % (sp, i), constraint_violation)
-            if CUSP_METHOD != 'none':
-                # Show original coefficients for the constrained atomic orbitals
-                print('    original coefficients:    ', coeff[sp][cusp_fixed_atorbs, i])
+            print(f'spin {sp}, orb {i}:')
+            # Show original coefficients for the constrained atomic orbitals
+            print('    constraint violation by: ', constraint_violation)
+            print('    original coefficients:   ', coeff[sp][cusp_fixed_atorbs, i])
             if CUSP_METHOD == 'project':
                 # Projected coefficients
                 projected_coeff = cusp_projection @ coeff[sp][:, i]
-                print('    projection coefficients:\n', projected_coeff)
-                print('    after projection       :', cusp_constraint @ projected_coeff)
+                print('    projection coefficients: ', projected_coeff)
+                print('    after projection:        ', cusp_constraint @ projected_coeff)
                 # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:, i] = projected_coeff
             if CUSP_METHOD == 'enforce':
                 # Apply the cusp enforcing projection to fix the coefficients
                 enforced_coeff = cusp_enforcing @ coeff[sp][:, i]
-                print('    constrained coefficients:\n', enforced_coeff[cusp_fixed_atorbs])
-                print('    after enforcing        :', cusp_constraint @ enforced_coeff)
+                print('    constrained coefficients:', enforced_coeff[cusp_fixed_atorbs])
+                print('    after enforcing:         ', cusp_constraint @ enforced_coeff)
                 # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:, i] = enforced_coeff
             if CUSP_METHOD != 'none':
@@ -612,8 +639,6 @@ if PLOT_CUSPS:
     r = [np.zeros((3, len(z))) + sto.atompos[at, :][:, None] for at in range(sto.num_atom)]
     for ir in r:
         ir[2, :] += z
-    # Print the boolean masks (which orbitals are marked as violating cusp conditions)
-    print(fixed)
     val_pre = [[sto.eval_molorbs(ir, spin=sp)[:, fixed[sp]] for sp in range(Nspins)] for ir in r]
     lap_pre = [[sto.eval_molorb_derivs(ir, spin=sp)[2][:, fixed[sp]] for sp in range(Nspins)] for ir in r]
 
@@ -626,7 +651,7 @@ if PLOT_CUSPS:
 
 if CUSP_METHOD != 'none':
     print('Molorb values at nuclei after applying cusp constraint:')
-    print(sto.eval_molorbs(sto.atompos.transpose()))
+    print(sto.eval_molorbs(sto.atompos.T))
     # assert np.all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 sto.writefile('stowfn.data')
@@ -657,7 +682,7 @@ if PLOT_CUSPS:
                 sgn = np.sign(vpre[len(vpre) // 2])  # sign normalization
                 # Plot wavefunction before and after correction
                 (pl,) = axval[at].plot(z, sgn * vpre, '--')
-                axval[at].plot(z, sgn * vpost, color=pl.get_color())
+                axval[at].plot(z, sgn * vpost, '-', color=pl.get_color())
                 # Plot Laplacian of the wavefunction + Coulomb term (without normalization).
                 # pl, = axeloc[at].plot(z, lap_pre[at][sp][:,i] + sto.atomnum[at]/z, '--')
                 # Compute local energy before and after correction:
@@ -690,6 +715,9 @@ if PLOT_CUSPS:
         axval[at].set_xlim(z[0], z[-1])
         axeloc[at].set_xlim(z[0], z[-1])
         axeloc[at].set_ylim(eloc_min, eloc_max)
+        # Add titles
+        axval[at].set_title(f'Atom {at+1} (Z={sto.atomnum[at]}): Wavefunction')
+        axeloc[at].set_title(f'Atom {at+1}: Local Energy')
     # Adjust layout and save figure
     fig.tight_layout()
     fig.savefig('cusp_constraint.svg')

@@ -19,6 +19,7 @@ The script has been verified to work with:
     Python 3.9.23
     NumPy 1.24.4
     scipy-weave 0.19.0
+    pybind >=3.0.0
 
 For optional plotting of the cusp constraints
 
@@ -50,6 +51,9 @@ This file can be used by CASINO setting the option
 in the CASINO input file.
 
 The following command-line options are supported:
-* `--plot-cusps` — enables plotting of cusps (default: disabled);
-* `--no-cusp-enforce` — disables enforcement of cusp conditions at nuclei (default: enforced).
-* `--dump` — generate a text dump of TAPE21.asc (default: no dump).
+* `adf2stowf` — use default: --cusp-method=enforce
+* `adf2stowf --plot-cusps` — enables cusps plotting (default: disabled);
+* `adf2stowf --cusp-method=enforce` — apply transformation to active orbitals (default).
+* `adf2stowf --cusp-method=project` — project out cusp-violating components
+* `adf2stowf --cusp-method=none` — disable any cusp correction
+* `adf2stowf --dump` — generate a text dump of TAPE21.asc (default: no dump).
