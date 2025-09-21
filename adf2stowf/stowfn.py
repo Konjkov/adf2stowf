@@ -355,7 +355,7 @@ for(int centre=0; centre<num_centres;centre++) {
 )
 
 
-class stowfn:
+class StoWfn:
     def __init__(self, fname=None):
         if fname is not None:
             self.readfile(fname)
@@ -816,7 +816,7 @@ class stowfn:
 
 
 if __name__ == '__main__':
-    sto = stowfn('stowfn.data')
+    sto = StoWfn('stowfn.data')
     sto.read_molorbmods('correlation.data')
     points = np.zeros((3, 4))
     points[:, 0] = (-0.19450689, -0.94412413, -0.67370571)

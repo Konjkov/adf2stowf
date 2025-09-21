@@ -11,9 +11,11 @@ import numpy as np
 
 from adf2stowf import adfread, cli_main, stowfn
 
+np.set_printoptions(suppress=True)
+
 ############
 
-PLOTCUSPS, CUSP_ENFORCE, DO_DUMP = cli_main.main()
+PLOT_CUSPS, CUSP_METHOD, DO_DUMP = cli_main.main()
 
 ############
 
@@ -502,8 +504,7 @@ norm_per_harmbasfn = np.concatenate(norm_per_centre)
 ############
 ############
 
-
-sto = stowfn.stowfn()
+sto = stowfn.StoWfn()
 
 sto.num_atom = Natoms
 
@@ -559,14 +560,11 @@ if False:
     print(sto.get_norm())
     # print(norm_per_harmbasfn - sto.get_norm())
 
-np.set_printoptions(suppress=True)
-
 # assert np.all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 cusp_fixed_atorbs = sto.cusp_fixed_atorbs()
 cusp_constraint = sto.cusp_constraint_matrix()
-# print("cusp_constraint_matrix:")
-# print(cusp_constraint)
+# print('cusp_constraint_matrix: ', cusp_constraint)
 cusp_projection = sto.cusp_projection_matrix()
 cusp_enforcing = sto.cusp_enforcing_matrix()
 
@@ -586,24 +584,29 @@ for sp in range(Nspins):
         if np.any(np.abs(constraint_violation) > 1e-9):
             fixed[sp][i] = True
             print('spin #%i, orb #%i - constraint violation by:' % (sp, i), constraint_violation)
-            if CUSP_ENFORCE:
+            if CUSP_METHOD != 'none':
                 # Show original coefficients for the constrained atomic orbitals
                 print('    original coefficients:    ', coeff[sp][cusp_fixed_atorbs, i])
-                # Projected coefficients (alternative approach)
+            if CUSP_METHOD == 'project':
+                # Projected coefficients
                 projected_coeff = cusp_projection @ coeff[sp][:, i]
                 print('    projection coefficients:\n', projected_coeff)
                 print('    after projection       :', cusp_constraint @ projected_coeff)
+                # Replace the original coefficients with the enforced (corrected) ones
+                coeff[sp][:, i] = projected_coeff
+            if CUSP_METHOD == 'enforce':
                 # Apply the cusp enforcing projection to fix the coefficients
                 enforced_coeff = cusp_enforcing @ coeff[sp][:, i]
                 print('    constrained coefficients:\n', enforced_coeff[cusp_fixed_atorbs])
                 print('    after enforcing        :', cusp_constraint @ enforced_coeff)
                 # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:, i] = enforced_coeff
+            if CUSP_METHOD != 'none':
                 # Re-check that constraint violation is now within the stricter tolerance
                 constraint_violation = cusp_constraint @ coeff[sp][:, i]
                 assert np.all(np.abs(constraint_violation) < 1e-8)
 
-if PLOTCUSPS:
+if PLOT_CUSPS:
     # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
     z = np.linspace(-0.5, 0.5, 501)
     r = [np.zeros((3, len(z))) + sto.atompos[at, :][:, None] for at in range(sto.num_atom)]
@@ -617,22 +620,22 @@ if PLOTCUSPS:
 sto.coeff = [c.T for c in coeff]
 sto.check_and_normalize()
 
-if PLOTCUSPS:
+if PLOT_CUSPS:
     val_post = [[sto.eval_molorbs(ir, spin=sp)[:, fixed[sp]] for sp in range(Nspins)] for ir in r]
     lap_post = [[sto.eval_molorb_derivs(ir, spin=sp)[2][:, fixed[sp]] for sp in range(Nspins)] for ir in r]
 
-if CUSP_ENFORCE:
+if CUSP_METHOD != 'none':
     print('Molorb values at nuclei after applying cusp constraint:')
     print(sto.eval_molorbs(sto.atompos.transpose()))
     # assert np.all(np.abs(norm_per_harmbasfn - sto.get_norm()) < 1e-13)
 
 sto.writefile('stowfn.data')
 
-if PLOTCUSPS:
+if PLOT_CUSPS:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print('The PLOTCUSPS feature requires the matplotlib library, which could not be found.')
+        print('The PLOT_CUSPS feature requires the matplotlib library, which could not be found.')
         sys.exit()
     Natom = sto.num_atom
     # Create a 2 x Natom grid of subplots
