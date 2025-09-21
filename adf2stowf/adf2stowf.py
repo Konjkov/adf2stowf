@@ -322,10 +322,10 @@ def select_coeff(sp):
             if occ > 1e-8:
                 partial_occupations[eigv] = occ
     # Print any leftover partial occupations
-    for k, v in iter(partial_occupations.items()):
+    for k, v in partial_occupations.items():
         print('spin=', sp, ': leftover partial occupation at E=', k, ': ', v)
     # Sanity check: should be no leftover occupation
-    assert np.sum(len(p) for p in partial_occupations) == 0
+    assert len(partial_occupations) == 0
     # Nmolorbs_total = len(valence_molorb_eigenvalue)
     # Number of occupied valence orbitals
     Nmolorbs_occup = len(valence_molorb_cart_coeff)
@@ -567,7 +567,7 @@ cusp_fixed_atorbs = sto.cusp_fixed_atorbs()
 cusp_constraint = sto.cusp_constraint_matrix()
 # print("cusp_constraint_matrix:")
 # print(cusp_constraint)
-# cusp_projection = sto.cusp_projection_matrix()
+cusp_projection = sto.cusp_projection_matrix()
 cusp_enforcing = sto.cusp_enforcing_matrix()
 
 print('Molorb values at nuclei before applying cusp constraint:')
@@ -589,19 +589,19 @@ for sp in range(Nspins):
             if CUSP_ENFORCE:
                 # Show original coefficients for the constrained atomic orbitals
                 print('    original coefficients:    ', coeff[sp][cusp_fixed_atorbs, i])
-                # Projected coefficients (alternative approach, commented out)
-                # projected_coeff = cusp_projection.A @ coeff[:,i]
-                # print("    proj coeff:",projected_coeff)
-                # print("    after projection       :", cusp_constraint @ projected_coeff)
+                # Projected coefficients (alternative approach)
+                projected_coeff = cusp_projection @ coeff[sp][:, i]
+                print('    projection coefficients:\n', projected_coeff)
+                print('    after projection       :', cusp_constraint @ projected_coeff)
                 # Apply the cusp enforcing projection to fix the coefficients
-                enforced_coeff = cusp_enforcing.A @ coeff[sp][:, i]
-                print('    constrained coefficients: ', enforced_coeff[cusp_fixed_atorbs])
+                enforced_coeff = cusp_enforcing @ coeff[sp][:, i]
+                print('    constrained coefficients:\n', enforced_coeff[cusp_fixed_atorbs])
+                print('    after enforcing        :', cusp_constraint @ enforced_coeff)
                 # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:, i] = enforced_coeff
                 # Re-check that constraint violation is now within the stricter tolerance
                 constraint_violation = cusp_constraint @ coeff[sp][:, i]
                 assert np.all(np.abs(constraint_violation) < 1e-8)
-                # print("    after enforcing        :", cusp_constraint @ enforced_coeff)
 
 if PLOTCUSPS:
     # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)

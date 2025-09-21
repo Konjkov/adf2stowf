@@ -759,7 +759,7 @@ class stowfn:
             numpy.ndarray: Matrix of shape (num_centres, num_atorbs) imposing nuclear cusp conditions.
         """
         norm = self.get_norm()
-        res = np.asmatrix(np.zeros((self.num_centres, self.num_atorbs)))
+        res = np.zeros((self.num_centres, self.num_atorbs))
         for core in range(self.num_centres):
             atorb_vals = self.eval_atorbs(self.centrepos[core][:, None])[0, :]
             for atorb, centre, nshell, N, _pl in self.iter_atorbs():
@@ -777,17 +777,12 @@ class stowfn:
         """Construct the projection matrix that enforces the cusp condition.
 
         Returns:
-            numpy.ndarray: Projector matrix (num_atorbs, num_atorbs).
+            numpy.ndarray: Projector matrix Q = I - P of shape (num_atorbs, num_atorbs),
+                           where P projects onto the subspace satisfying cusp conditions.
         """
-        # print "cusp_constraint: ",cusp_constraint
-        _U, _S, Vh = np.linalg.svd(self.cusp_constraint_matrix(), full_matrices=False)
-        # print "shapes U,S,Vh",U.shape,S.shape,Vh.shape
-        P = Vh.T * Vh
-        # print "proj shape",cusp_constraint_projector.shape
-        # print "proj trace",P.trace()
-        # print "proj squarediff", np.linalg.norm(P - P*P)
-        Q = np.eye(P.shape[0]) - P
-        return Q
+        _, _, Vh = np.linalg.svd(self.cusp_constraint_matrix(), full_matrices=False)
+        P = Vh.T @ Vh
+        return np.eye(P.shape[0]) - P
 
     def cusp_fixed_atorbs(self):
         """Determine the atomic orbitals fixed by the cusp constraint.
@@ -813,11 +808,10 @@ class stowfn:
         constraint = self.cusp_constraint_matrix()
         res = constraint + 0.0
         res[:, cusp_fixed_atorb] = 0.0
-        U, S, Vh = np.linalg.svd(constraint[:, cusp_fixed_atorb], full_matrices=False)
-        tmpinv = Vh.T * np.asmatrix(np.diag(1 / S)) * U.T
-        res = -tmpinv * res
-        mat = np.asmatrix(np.eye(self.num_atorbs))
-        mat[cusp_fixed_atorb, :] = res
+        U, sigma, Vh = np.linalg.svd(constraint[:, cusp_fixed_atorb], full_matrices=False)
+        inv = Vh.T @ np.diag(1 / sigma) @ U.T
+        mat = np.eye(self.num_atorbs)
+        mat[cusp_fixed_atorb, :] = -inv @ res
         return mat
 
 
