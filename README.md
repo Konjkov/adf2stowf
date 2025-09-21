@@ -52,8 +52,26 @@ in the CASINO input file.
 
 The following command-line options are supported:
 * `adf2stowf` — use default: --cusp-method=enforce
-* `adf2stowf --plot-cusps` — enables cusps plotting (default: disabled);
-* `adf2stowf --cusp-method=enforce` — apply transformation to active orbitals (default).
+* `adf2stowf --plot-cusps` — enables cusps plotting (default: disabled)
+* `adf2stowf --cusp-method=enforce` — apply transformation to active orbitals (default)
 * `adf2stowf --cusp-method=project` — project out cusp-violating components
 * `adf2stowf --cusp-method=none` — disable any cusp correction
-* `adf2stowf --dump` — generate a text dump of TAPE21.asc (default: no dump).
+* `adf2stowf --dump` — generate a text dump of TAPE21.asc (default: no dump)
+* `adf2stowf --cart2harm-projection` — enforce pure spherical harmonics via projection
+
+You may see a warning like this during conversion:
+
+    WARNING: cartesian to sperical conversion for spin 0, orb 0 violated by 0.00063567
+
+This indicates that the original molecular orbitals (computed in Cartesian Gaussian basis) contain
+non-spherical components — for example, s-type contamination (x²+y²+z²) in d- or f-shells. These
+components violate angular momentum purity and are unphysical in a spherical harmonic representation.
+
+You can eliminate this warning — and enforce physically correct orbitals — by enabling the `--cart2harm-projection` flag.
+This flag applies an orthogonal projection that removes all constraint-violating components, ensuring your orbitals are
+expressed strictly in pure spherical harmonics — as required CASINO code.
+
+Without `--cart2harm-projection`, the code maps only the pure spherical components (e.g., 5 of 6 for d-shells), ignoring
+the rest — like the s-type contaminant (x²+y²+z²) — and implicitly assumes they are zero.
+
+❗ Important note on energy: Even after projection, the total energy may not match the original Cartesian-basis energy.

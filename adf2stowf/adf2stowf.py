@@ -20,7 +20,7 @@ np.set_printoptions(
 
 ############
 
-PLOT_CUSPS, CUSP_METHOD, DO_DUMP = cli_main.main()
+PLOT_CUSPS, CUSP_METHOD, DO_DUMP, CART2HARM_PROJECTION = cli_main.main()
 
 ############
 
@@ -411,30 +411,32 @@ for c in range(Natoms):
 assert i == Nharmbasfns
 assert j == Nvalence_cartbasfn
 
-# if len(cart2harm_constraint) > 0:
-#     cart2harm_constraint = np.concatenate(cart2harm_constraint, axis=0)
-#     # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
-#     A = cart2harm_constraint  # shape: (K, Ncart)
-#     # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
-#     from scipy.linalg import null_space
-#     # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
-#     Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
-#     P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
-#     # Apply projection to each molecular orbital
-#     for sp in range(Nspins):
-#         for m in range(Nvalence_molorbs[sp]):
-#             # Original Cartesian orbital coefficient vector
-#             C = valence_molorb_cart_coeff[sp][m, :].copy()
-#             # Project onto pure spherical harmonic subspace
-#             C_proj = P @ C
-#             # Overwrite with projected coefficients
-#             valence_molorb_cart_coeff[sp][m, :] = C_proj
-#
-#             # Verify constraint satisfaction: should be numerically zero
-#             violation = A @ C_proj
-#             absviolation = np.linalg.norm(violation)
-#             if absviolation > 1e-10:
-#                 print(f"WARNING: Projection failed for spin {sp}, orb {m}: {absviolation}")
+if len(cart2harm_constraint) > 0:
+    cart2harm_constraint = np.concatenate(cart2harm_constraint, axis=0)
+    if CART2HARM_PROJECTION:
+        # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
+        A = cart2harm_constraint  # shape: (K, Ncart)
+        # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
+        from scipy.linalg import null_space
+
+        # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
+        Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
+        P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
+        # Apply projection to each molecular orbital
+        for sp in range(Nspins):
+            for m in range(Nvalence_molorbs[sp]):
+                # Original Cartesian orbital coefficient vector
+                C = valence_molorb_cart_coeff[sp][m, :].copy()
+                # Project onto pure spherical harmonic subspace
+                C_proj = P @ C
+                # Overwrite with projected coefficients
+                valence_molorb_cart_coeff[sp][m, :] = C_proj
+
+                # Verify constraint satisfaction: should be numerically zero
+                violation = A @ C_proj
+                absviolation = np.linalg.norm(violation)
+                if absviolation > 1e-10:
+                    print(f'WARNING: Projection failed for spin {sp}, orb {m:2d}: {absviolation:.13f}')
 
 valence_molorb_harm_coeff = [np.zeros((Nharmbasfns, Nvalence_molorbs[sp])) for sp in range(Nspins)]
 
@@ -445,7 +447,7 @@ for sp in range(Nspins):
             violation = cart2harm_constraint @ valence_molorb_cart_coeff[sp][m, :]
             absviolation = np.sqrt(np.sum(np.abs(violation**2)))
             if absviolation > 1e-5:
-                print(f'WARNING: cartesian to sperical conversion for spin {sp}, orb {m} violated by {absviolation}')
+                print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {absviolation:.8f}')
 
 
 #######################

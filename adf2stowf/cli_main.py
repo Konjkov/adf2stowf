@@ -13,6 +13,7 @@ def main():
           %(prog)s --cusp-method=project        # project out cusp-violating components
           %(prog)s --cusp-method=none           # disable any cusp correction
           %(prog)s --dump                       # generate a text dump of the parsed data
+          %(prog)s --cart2harm-projection       # enforce pure spherical harmonics via projection
           %(prog)s --cusp-method=project --dump
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -34,8 +35,19 @@ def main():
         """.strip(),
     )
 
+    parser.add_argument(
+        '--cart2harm-projection',
+        action='store_true',
+        help="""
+                Enforce conversion from Cartesian to pure spherical harmonic Gaussian basis functions
+                via orthogonal projection. Removes non-spherical components (e.g., s-type contamination
+                in d/f shells like x²+y²+z²) that violate angular momentum purity. This ensures physical
+                consistency but may change total energy if original orbitals contained such contamination.
+            """.strip(),
+    )
+
     parser.add_argument('--dump', action='store_true', help='Generate a text dump (.txt) of the parsed ADF data for debugging (default: False)')
 
     args = parser.parse_args()
 
-    return args.plot_cusps, args.cusp_method, args.dump
+    return args.plot_cusps, args.cusp_method, args.dump, args.cart2harm_projection
