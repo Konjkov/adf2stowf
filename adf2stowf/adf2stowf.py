@@ -284,9 +284,9 @@ def select_coeff(sp):
     X = ['A', 'B'][sp]  # Label for spin channel: "A" or "B"
 
     # Lists to store valence orbital data
-    valence_molorb_cart_coeff = []
-    valence_molorb_occupation = []
-    valence_molorb_eigenvalue = []
+    molorb_cart_coeff = []
+    molorb_occupation = []
+    molorb_eigenvalue = []
     # Dictionary to store leftover partial occupations
     partial_occupations = {}
     # Loop over all symmetries
@@ -309,22 +309,21 @@ def select_coeff(sp):
         # Loop over all orbitals
         for o in range(nmo_X):
             eigv = eps_X[o]
-
-            valence_molorb_eigenvalue += [eigv]
             occ = froc_X[o]
+            molorb_eigenvalue.append(eigv)
             # Add any leftover partial occupation for this eigenvalue
             if eigv in partial_occupations:
                 occ += partial_occupations.pop(eigv)
             # Check if orbital is considered "occupied"
             if occ + 1e-8 >= 2.0 / Nspins:
-                valence_molorb_occupation += [1]
+                molorb_occupation.append(1)
                 occ -= 2.0 / Nspins
                 # Construct coefficient vector in Cartesian basis
-                coeff = np.zeros((Nvalence_cartbasfn,))
-                coeff[npart] = Eigen_Bas_X[o, :]
-                valence_molorb_cart_coeff += [coeff]
+                coeff = np.zeros(shape=(Nvalence_cartbasfn,))
+                coeff[npart] = Eigen_Bas_X[o]
+                molorb_cart_coeff.append(coeff)
             else:
-                valence_molorb_occupation += [0]
+                molorb_occupation.append(0)
             # Store leftover fractional occupation
             if occ > 1e-8:
                 partial_occupations[eigv] = occ
@@ -335,22 +334,21 @@ def select_coeff(sp):
     assert len(partial_occupations) == 0
     # Nmolorbs_total = len(valence_molorb_eigenvalue)
     # Number of occupied valence orbitals
-    Nmolorbs_occup = len(valence_molorb_cart_coeff)
-
-    assert np.sum(valence_molorb_occupation) == Nmolorbs_occup
+    Nmolorbs_occup = len(molorb_cart_coeff)
+    assert np.sum(molorb_occupation) == Nmolorbs_occup
     # Convert lists to NumPy arrays
-    valence_molorb_occupation = np.array(valence_molorb_occupation)
-    valence_molorb_eigenvalue = np.array(valence_molorb_eigenvalue)
-    valence_molorb_cart_coeff = np.array(valence_molorb_cart_coeff)
+    molorb_occupation = np.array(molorb_occupation)
+    molorb_eigenvalue = np.array(molorb_eigenvalue)
+    molorb_cart_coeff = np.array(molorb_cart_coeff)
 
     # Ensure 2D shape even if only one orbital exists (e.g., hydrogen)
-    if valence_molorb_cart_coeff.ndim == 1:
-        valence_molorb_cart_coeff = valence_molorb_cart_coeff.reshape(1, -1)
+    if molorb_cart_coeff.ndim == 1:
+        molorb_cart_coeff = molorb_cart_coeff.reshape(1, -1)
 
     # Identify occupied and unoccupied orbitals
-    occupied = valence_molorb_occupation[:] == 1
-    occidx = valence_molorb_eigenvalue[occupied]
-    unoccidx = valence_molorb_eigenvalue[~occupied]
+    occupied = molorb_occupation[:] == 1
+    occidx = molorb_eigenvalue[occupied]
+    unoccidx = molorb_eigenvalue[~occupied]
     # Check HOMO-LUMO ordering (warning if HOMO > LUMO)
     if len(occidx) > 0 and len(unoccidx) > 0:
         HOMO = max(occidx)
@@ -358,14 +356,12 @@ def select_coeff(sp):
         if HOMO > LUMO:
             print('Warning: HOMO > LUMO (may happen in some cases)')
     # Keep only occupied eigenvalues
-    valence_molorb_eigenvalue = valence_molorb_eigenvalue[occupied]
+    molorb_eigenvalue = molorb_eigenvalue[occupied]
     # Sanity check: number of orbitals matches number of coefficients
-    assert len(valence_molorb_eigenvalue) == Nmolorbs_occup
+    assert len(molorb_eigenvalue) == Nmolorbs_occup
     # Sort orbitals by eigenvalue
-    order = valence_molorb_eigenvalue.argsort()
-    valence_molorb_cart_coeff = valence_molorb_cart_coeff[order, :]
-
-    return valence_molorb_cart_coeff
+    order = molorb_eigenvalue.argsort()
+    return molorb_cart_coeff[order]
 
 
 valence_molorb_cart_coeff = [select_coeff(sp) for sp in range(Nspins)]
