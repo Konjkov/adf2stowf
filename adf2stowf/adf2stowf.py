@@ -619,7 +619,7 @@ for sp in range(Nspins):
             if CUSP_METHOD == 'project':
                 # Projected coefficients
                 projected_coeff = cusp_projection @ coeff[sp][:, i]
-                print('    projection coefficients: ', projected_coeff)
+                print('    projection coefficients:\n', projected_coeff)
                 print('    after projection:        ', cusp_constraint @ projected_coeff)
                 # Replace the original coefficients with the enforced (corrected) ones
                 coeff[sp][:, i] = projected_coeff

@@ -7,7 +7,8 @@ program.
 
 For general information about the ADF program, see http://www.scm.com/
 
-For help and further information about this script, please contact the author:
+For help and further information about this script, please contact the authors:
+    Konkov Vladimir <Konjkov.VV@gmail.com>
     Norbert Nemec <Norbert@Nemec-online.de>
 
 

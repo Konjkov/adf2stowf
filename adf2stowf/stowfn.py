@@ -784,9 +784,6 @@ class StoWfn:
         """
         Q_ns = null_space(self.cusp_constraint_matrix())
         return Q_ns @ Q_ns.T
-        # _, _, Vh = np.linalg.svd(self.cusp_constraint_matrix(), full_matrices=False)
-        # P = Vh.T @ Vh
-        # return np.eye(P.shape[0]) - P
 
     def cusp_fixed_atorbs(self):
         """Determine the atomic orbitals fixed by the cusp constraint.
