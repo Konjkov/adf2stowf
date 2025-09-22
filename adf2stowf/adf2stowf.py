@@ -20,7 +20,7 @@ np.set_printoptions(
 
 ############
 
-PLOT_CUSPS, CUSP_METHOD, DO_DUMP, CART2HARM_PROJECTION = cli_main.main()
+PLOT_CUSPS, CUSP_METHOD, DO_DUMP, CART2HARM_PROJECTION, ONLY_OCCUPIED = cli_main.main()
 
 ############
 
@@ -298,8 +298,8 @@ def select_coeff(sp):
         # Fractional occupations for each orbital
         froc_X = Section['froc_' + X]
         assert len(froc_X) == norb[sym]
-        # Skip if all occupations are zero
-        if np.all(froc_X == 0.0):
+        # Skip this symmetry only when we want only occupied orbitals
+        if np.all(froc_X == 0.0) and ONLY_OCCUPIED:
             continue
         # Indices of basis functions for this symmetry
         npart = Section['npart'] - 1
@@ -314,16 +314,18 @@ def select_coeff(sp):
             # Add any leftover partial occupation for this eigenvalue
             if eigv in partial_occupations:
                 occ += partial_occupations.pop(eigv)
+            coeff = np.zeros(shape=(Nvalence_cartbasfn,))
+            coeff[npart] = Eigen_Bas_X[o]
             # Check if orbital is considered "occupied"
             if occ + 1e-8 >= 2.0 / Nspins:
                 molorb_occupation.append(1)
                 occ -= 2.0 / Nspins
                 # Construct coefficient vector in Cartesian basis
-                coeff = np.zeros(shape=(Nvalence_cartbasfn,))
-                coeff[npart] = Eigen_Bas_X[o]
                 molorb_cart_coeff.append(coeff)
             else:
                 molorb_occupation.append(0)
+                if not ONLY_OCCUPIED:
+                    molorb_cart_coeff.append(coeff)
             # Store leftover fractional occupation
             if occ > 1e-8:
                 partial_occupations[eigv] = occ
@@ -332,19 +334,13 @@ def select_coeff(sp):
         print('spin=', sp, ': leftover partial occupation at E=', k, ': ', v)
     # Sanity check: should be no leftover occupation
     assert len(partial_occupations) == 0
-    # Nmolorbs_total = len(valence_molorb_eigenvalue)
-    # Number of occupied valence orbitals
-    Nmolorbs_occup = len(molorb_cart_coeff)
-    assert np.sum(molorb_occupation) == Nmolorbs_occup
     # Convert lists to NumPy arrays
     molorb_occupation = np.array(molorb_occupation)
     molorb_eigenvalue = np.array(molorb_eigenvalue)
     molorb_cart_coeff = np.array(molorb_cart_coeff)
-
     # Ensure 2D shape even if only one orbital exists (e.g., hydrogen)
     if molorb_cart_coeff.ndim == 1:
         molorb_cart_coeff = molorb_cart_coeff.reshape(1, -1)
-
     # Identify occupied and unoccupied orbitals
     occupied = molorb_occupation[:] == 1
     occidx = molorb_eigenvalue[occupied]
@@ -355,19 +351,29 @@ def select_coeff(sp):
         LUMO = min(unoccidx)
         if HOMO > LUMO:
             print('Warning: HOMO > LUMO (may happen in some cases)')
-    # Keep only occupied eigenvalues
-    molorb_eigenvalue = molorb_eigenvalue[occupied]
-    # Sanity check: number of orbitals matches number of coefficients
-    assert len(molorb_eigenvalue) == Nmolorbs_occup
+    if ONLY_OCCUPIED:
+        # Keep only occupied eigenvalues
+        molorb_eigenvalue = molorb_eigenvalue[occupied]
+        # Number of occupied valence orbitals
+        Nmolorbs_occup = len(molorb_cart_coeff)
+        # Sanity check: number of orbitals matches number of coefficients
+        assert len(molorb_eigenvalue) == Nmolorbs_occup
+        assert np.sum(molorb_occupation) == Nmolorbs_occup
+    else:
+        Nmolorbs_total = len(molorb_eigenvalue)
+        # when returning all orbitals, ensure we have coefficients for each eigenvalue appended
+        assert molorb_cart_coeff.shape[0] == Nmolorbs_total
     # Sort orbitals by eigenvalue
     order = molorb_eigenvalue.argsort()
     return molorb_cart_coeff[order]
 
 
 valence_molorb_cart_coeff = [select_coeff(sp) for sp in range(Nspins)]
+print(valence_molorb_cart_coeff)
 Nvalence_molorbs = np.array([c.shape[0] for c in valence_molorb_cart_coeff])
 
-assert np.sum(Nvalence_molorbs) * (3 - Nspins) == Nvalence_electrons
+if ONLY_OCCUPIED:
+    assert np.sum(Nvalence_molorbs) * (3 - Nspins) == Nvalence_electrons
 
 ##############################
 

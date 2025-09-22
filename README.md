@@ -58,6 +58,7 @@ The following command-line options are supported:
 * `adf2stowf --cusp-method=enforce` — apply transformation to active orbitals (default)
 * `adf2stowf --cusp-method=project` — project out cusp-violating components
 * `adf2stowf --cusp-method=none` — disable any cusp correction
+* `adf2stowf --all-orbitals` — include also virtual orbitals (default: only occupied)
 * `adf2stowf --dump` — generate a text dump of TAPE21.asc (default: no dump)
 * `adf2stowf --cart2harm-projection` — enforce pure spherical harmonics via projection
 
