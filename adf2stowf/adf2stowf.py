@@ -368,9 +368,9 @@ def select_coeff(sp):
     return molorb_cart_coeff[order]
 
 
-valence_molorb_cart_coeff = [select_coeff(sp) for sp in range(Nspins)]
-print(valence_molorb_cart_coeff)
-Nvalence_molorbs = np.array([c.shape[0] for c in valence_molorb_cart_coeff])
+molorb_cart_coeff = [select_coeff(sp) for sp in range(Nspins)]
+# print(molorb_cart_coeff)
+Nvalence_molorbs = np.array([c.shape[0] for c in molorb_cart_coeff])
 
 if ONLY_OCCUPIED:
     assert np.sum(Nvalence_molorbs) * (3 - Nspins) == Nvalence_electrons
@@ -428,11 +428,11 @@ if len(cart2harm_constraint) > 0:
         for sp in range(Nspins):
             for m in range(Nvalence_molorbs[sp]):
                 # Original Cartesian orbital coefficient vector
-                C = valence_molorb_cart_coeff[sp][m, :].copy()
+                C = molorb_cart_coeff[sp][m, :].copy()
                 # Project onto pure spherical harmonic subspace
                 C_proj = P @ C
                 # Overwrite with projected coefficients
-                valence_molorb_cart_coeff[sp][m, :] = C_proj
+                molorb_cart_coeff[sp][m, :] = C_proj
 
                 # Verify constraint satisfaction: should be numerically zero
                 violation = A @ C_proj
@@ -443,13 +443,13 @@ if len(cart2harm_constraint) > 0:
 valence_molorb_harm_coeff = [np.zeros((Nharmbasfns, Nvalence_molorbs[sp])) for sp in range(Nspins)]
 
 for sp in range(Nspins):
-    for m in range(Nvalence_molorbs[sp]):
-        valence_molorb_harm_coeff[sp][:, m] = cart2harm_matrix @ valence_molorb_cart_coeff[sp][m, :]
-        if len(cart2harm_constraint) > 0:
-            violation = cart2harm_constraint @ valence_molorb_cart_coeff[sp][m, :]
-            absviolation = np.sqrt(np.sum(np.abs(violation**2)))
-            if absviolation > 1e-5:
-                print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {absviolation:.8f}')
+    valence_molorb_harm_coeff[sp] = cart2harm_matrix @ molorb_cart_coeff[sp].T
+    if len(cart2harm_constraint) > 0:
+        violation = cart2harm_constraint @ molorb_cart_coeff[sp].T
+        absviolations = np.linalg.norm(violation, axis=0)
+        for m, err in enumerate(absviolations):
+            if err > 1e-5:
+                print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
 
 #######################
