@@ -77,7 +77,7 @@ harm2cart_map = {
     # P-shell:
     3: np.eye(3),
     # D-shell:
-    # from stowfdet code:
+    # from CASINO/stowfdet.f90 code:
     #   poly(5)=xy         D(-2)
     #   poly(6)=yz         D(-1)
     #   poly(7)=xz         D( 1)
@@ -86,16 +86,16 @@ harm2cart_map = {
     #                      S
     4: np.array(
         [
-            [0, 0, 0, -1,  1, +1],  # xx
-            [1, 0, 0,  0,  0, +0],  # xy
-            [0, 0, 1,  0,  0, +0],  # xz
-            [0, 0, 0, -1, -1, +1],  # yy
-            [0, 1, 0,  0,  0, +0],  # yz
-            [0, 0, 0,  2,  0, +1],  # zz
+            [0, 0, 0, -1,  1, 1],  # xx
+            [1, 0, 0,  0,  0, 0],  # xy
+            [0, 0, 1,  0,  0, 0],  # xz
+            [0, 0, 0, -1, -1, 1],  # yy
+            [0, 1, 0,  0,  0, 0],  # yz
+            [0, 0, 0,  2,  0, 1],  # zz
         ]
     ),
     # F-shell:
-    # from stowfdet code:
+    # from CASINO/stowfdet.f90 code:
     #    poly(10)=2zzz-3(xxz+yyz)  F( 0)
     #    poly(11)=4xzz-(xx+yy)*x   F( 1)
     #    poly(12)=4yzz-(xx+yy)*y   F(-1)
@@ -108,16 +108,16 @@ harm2cart_map = {
     #                              P_z
     5: np.array(
         [
-            [ 0, -1,  0,  0, 0,  1,  0, +1, 0, 0],  # xxx
-            [ 0,  0, -1,  0, 0,  0,  3, +0, 1, 0],  # xxy
-            [-3,  0,  0,  1, 0,  0,  0, +0, 0, 1],  # xxz
-            [ 0, -1,  0,  0, 0, -3,  0, +1, 0, 0],  # xyy
-            [ 0,  0,  0,  0, 1,  0,  0, +0, 0, 0],  # xyz
-            [ 0,  4,  0,  0, 0,  0,  0, +1, 0, 0],  # xzz
-            [ 0,  0, -1,  0, 0,  0, -1, +0, 1, 0],  # yyy
-            [-3,  0,  0, -1, 0,  0,  0, +0, 0, 1],  # yyz
-            [ 0,  0,  4,  0, 0,  0,  0, +0, 1, 0],  # yzz
-            [ 2,  0,  0,  0, 0,  0,  0, +0, 0, 1],  # zzz
+            [ 0, -1,  0,  0, 0,  1,  0, 1, 0, 0],  # xxx
+            [ 0,  0, -1,  0, 0,  0,  3, 0, 1, 0],  # xxy
+            [-3,  0,  0,  1, 0,  0,  0, 0, 0, 1],  # xxz
+            [ 0, -1,  0,  0, 0, -3,  0, 1, 0, 0],  # xyy
+            [ 0,  0,  0,  0, 1,  0,  0, 0, 0, 0],  # xyz
+            [ 0,  4,  0,  0, 0,  0,  0, 1, 0, 0],  # xzz
+            [ 0,  0, -1,  0, 0,  0, -1, 0, 1, 0],  # yyy
+            [-3,  0,  0, -1, 0,  0,  0, 0, 0, 1],  # yyz
+            [ 0,  0,  4,  0, 0,  0,  0, 0, 1, 0],  # yzz
+            [ 2,  0,  0,  0, 0,  0,  0, 0, 0, 1],  # zzz
         ]
     ),
 }  # fmt: skip
@@ -380,74 +380,57 @@ if ONLY_OCCUPIED:
 ##############################
 
 cart2harm_matrix = np.zeros((Nharmbasfns, Nvalence_cartbasfn))
-cart2harm_constraint = []
+cart2harm_constraint = np.zeros((Nvalence_cartbasfn - Nharmbasfns, Nvalence_cartbasfn))
 i, j = 0, 0
 for c in range(Natoms):
     at = atyp_idx[c]
     for st in core_shelltype_per_atomtype[at]:
         i += Nharmpoly_per_shelltype[st]
-
     for st in valence_shelltype_per_atomtype[at]:
         n_harm = Nharmpoly_per_shelltype[st]
         n_cart = Ncartpoly_per_shelltype[st]
-        if st == 1:  # S shell
-            cart2harm_matrix[i, j] = 1
-        elif st == 3:  # P shell
-            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = np.eye(3)
-        elif st == 4:  # D shell
-            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
-            constraint = np.zeros([1, Nvalence_cartbasfn])
-            constraint[:, j : j + n_cart] = cart2harm_map[st][n_harm:]
-            cart2harm_constraint += [constraint]
-        elif st == 5:  # F shell
-            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
-            constraint = np.zeros([3, Nvalence_cartbasfn])
-            constraint[:, j : j + n_cart] = cart2harm_map[st][n_harm:]
-            cart2harm_constraint += [constraint]
+        cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
+        if n_cart > n_harm:  # D & F shell
+            cart2harm_constraint[j - i : j - i + n_cart - n_harm, j : j + n_cart] = cart2harm_map[st][n_harm:]
         i += n_harm
         j += n_cart
 
 assert i == Nharmbasfns
 assert j == Nvalence_cartbasfn
 
-if len(cart2harm_constraint) > 0:
-    cart2harm_constraint = np.concatenate(cart2harm_constraint, axis=0)
-    if CART2HARM_PROJECTION:
-        # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
-        A = cart2harm_constraint  # shape: (K, Ncart)
-        # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
-        from scipy.linalg import null_space
-
-        # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
-        Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
-        P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
-        # Apply projection to each molecular orbital
-        for sp in range(Nspins):
-            for m in range(Nvalence_molorbs[sp]):
-                # Original Cartesian orbital coefficient vector
-                C = molorb_cart_coeff[sp][m, :].copy()
-                # Project onto pure spherical harmonic subspace
-                C_proj = P @ C
-                # Overwrite with projected coefficients
-                molorb_cart_coeff[sp][m, :] = C_proj
-
-                # Verify constraint satisfaction: should be numerically zero
-                violation = A @ C_proj
-                absviolation = np.linalg.norm(violation)
-                if absviolation > 1e-10:
-                    print(f'WARNING: Projection failed for spin {sp}, orb {m:2d}: {absviolation:.13f}')
-
-valence_molorb_harm_coeff = [np.zeros((Nharmbasfns, Nvalence_molorbs[sp])) for sp in range(Nspins)]
-
 for sp in range(Nspins):
-    valence_molorb_harm_coeff[sp] = cart2harm_matrix @ molorb_cart_coeff[sp].T
-    if len(cart2harm_constraint) > 0:
-        violation = cart2harm_constraint @ molorb_cart_coeff[sp].T
-        absviolations = np.linalg.norm(violation, axis=0)
-        for m, err in enumerate(absviolations):
-            if err > 1e-5:
-                print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
+    violation = cart2harm_constraint @ molorb_cart_coeff[sp].T
+    absviolations = np.linalg.norm(violation, axis=0)
+    for m, err in enumerate(absviolations):
+        if err > 1e-5:
+            print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
+if CART2HARM_PROJECTION:
+    # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
+    A = cart2harm_constraint  # shape: (K, Ncart)
+    # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
+    from scipy.linalg import null_space
+
+    # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
+    Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
+    P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
+    # Apply projection to each molecular orbital
+    for sp in range(Nspins):
+        for m in range(Nvalence_molorbs[sp]):
+            # Original Cartesian orbital coefficient vector
+            C = molorb_cart_coeff[sp][m, :].copy()
+            # Project onto pure spherical harmonic subspace
+            C_proj = P @ C
+            # Overwrite with projected coefficients
+            molorb_cart_coeff[sp][m, :] = C_proj
+
+            # Verify constraint satisfaction: should be numerically zero
+            violation = A @ C_proj
+            absviolation = np.linalg.norm(violation)
+            if absviolation > 1e-10:
+                print(f'WARNING: Projection failed for spin {sp}, orb {m:2d}: {absviolation:.13f}')
+
+valence_molorb_harm_coeff = [cart2harm_matrix @ molorb_cart_coeff[sp].T for sp in range(Nspins)]
 
 #######################
 # fixed core orbitals #
