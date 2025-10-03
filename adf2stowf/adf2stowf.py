@@ -71,56 +71,58 @@ assert np.all(atomicnumber_per_atomtype[Natomtypes:] == 0)
 Nharmpoly_per_shelltype = np.array([0, 1, 4, 3, 5, 7])
 Ncartpoly_per_shelltype = np.array([0, 1, 0, 3, 6, 10])
 
-harm2cart_per_shelltype = [
-    np.eye(1),  # dummy
-    np.eye(1),
-    np.eye(1),  # dummy
-    np.eye(3),
+harm2cart_map = {
+    # S-shell:
+    1: np.eye(1),
+    # P-shell:
+    3: np.eye(3),
+    # D-shell:
     # from stowfdet code:
-    #   poly(5)=xy
-    #   poly(6)=yz
-    #   poly(7)=zx
-    #   poly(8)=(3*zz-r(2)) == 2zz-xx-yy
-    #   poly(9)=(xx-yy)
-    np.array(
+    #   poly(5)=xy         D(-2)
+    #   poly(6)=yz         D(-1)
+    #   poly(7)=xz         D( 1)
+    #   poly(8)=2zz-xx-yy  D( 0)
+    #   poly(9)=xx-yy      D( 2)
+    #                      S
+    4: np.array(
         [
-            [0.0, 0.0, 0.0, -1.0, 1.0, +++1],  # x**2
-            [1.0, 0.0, 0.0, 0.0, 0.0, +++0],  # x*y
-            [0.0, 0.0, 1.0, 0.0, 0.0, +++0],  # x*z
-            [0.0, 0.0, 0.0, -1.0, -1.0, +++1],  # y**2
-            [0.0, 1.0, 0.0, 0.0, 0.0, +++0],  # y*z
-            [0.0, 0.0, 0.0, 2.0, 0.0, +++1],  # z**2
+            [0, 0, 0, -1,  1, +1],  # xx
+            [1, 0, 0,  0,  0, +0],  # xy
+            [0, 0, 1,  0,  0, +0],  # xz
+            [0, 0, 0, -1, -1, +1],  # yy
+            [0, 1, 0,  0,  0, +0],  # yz
+            [0, 0, 0,  2,  0, +1],  # zz
         ]
     ),
+    # F-shell:
     # from stowfdet code:
-    #    xx_yy3=xx-3*yy
-    #    xx3_yy=3*xx-yy
-    #    zz5=5*zz
-    #    zz5_rr = zz5-r(2)
-    #    poly(10)=(zz5-3*r(2))*z       ! (2*zz-3*(xx+yy))*z
-    #    poly(11)=zz5_rr*x             ! (4*zz-(xx+yy))*x
-    #    poly(12)=zz5_rr*y             ! (4*zz-(xx+yy))*y
-    #    poly(13)=(xx-yy)*z
-    #    poly(14)=xy*z
-    #    poly(15)=xx_yy3*x
-    #    poly(16)=xx3_yy*y
-    np.array(
+    #    poly(10)=2zzz-3(xxz+yyz)  F( 0)
+    #    poly(11)=4xzz-(xx+yy)*x   F( 1)
+    #    poly(12)=4yzz-(xx+yy)*y   F(-1)
+    #    poly(13)=(xx-yy)*z        F( 2)
+    #    poly(14)=xyz              F(-2)
+    #    poly(15)=xxx-3xyy         F( 3)
+    #    poly(16)=3xx-yyy          F(-3)
+    #                              P_x
+    #                              P_y
+    #                              P_z
+    5: np.array(
         [
-            [0.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, +++1, 0, 0],  # x*x*x
-            [0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 3.0, +++0, 1, 0],  # x*x*y
-            [-3.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, +++0, 0, 1],  # x*x*z
-            [0.0, -1.0, 0.0, 0.0, 0.0, -3.0, 0.0, +++1, 0, 0],  # x*y*y
-            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, +++0, 0, 0],  # x*y*z
-            [0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, +++1, 0, 0],  # x*z*z
-            [0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0, +++0, 1, 0],  # y*y*y
-            [-3.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, +++0, 0, 1],  # y*y*z
-            [0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, +++0, 1, 0],  # y*z*z
-            [2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, +++0, 0, 1],  # z*z*z
+            [ 0, -1,  0,  0, 0,  1,  0, +1, 0, 0],  # xxx
+            [ 0,  0, -1,  0, 0,  0,  3, +0, 1, 0],  # xxy
+            [-3,  0,  0,  1, 0,  0,  0, +0, 0, 1],  # xxz
+            [ 0, -1,  0,  0, 0, -3,  0, +1, 0, 0],  # xyy
+            [ 0,  0,  0,  0, 1,  0,  0, +0, 0, 0],  # xyz
+            [ 0,  4,  0,  0, 0,  0,  0, +1, 0, 0],  # xzz
+            [ 0,  0, -1,  0, 0,  0, -1, +0, 1, 0],  # yyy
+            [-3,  0,  0, -1, 0,  0,  0, +0, 0, 1],  # yyz
+            [ 0,  0,  4,  0, 0,  0,  0, +0, 1, 0],  # yzz
+            [ 2,  0,  0,  0, 0,  0,  0, +0, 0, 1],  # zzz
         ]
     ),
-]
+}  # fmt: skip
 
-cart2harm_per_shelltype = [np.linalg.inv(m) for m in harm2cart_per_shelltype]
+cart2harm_map = {st: np.linalg.inv(M) for st, M in harm2cart_map.items()}
 
 #####################
 # Valence basis set #
@@ -386,29 +388,24 @@ for c in range(Natoms):
         i += Nharmpoly_per_shelltype[st]
 
     for st in valence_shelltype_per_atomtype[at]:
+        n_harm = Nharmpoly_per_shelltype[st]
+        n_cart = Ncartpoly_per_shelltype[st]
         if st == 1:  # S shell
-            cart2harm_matrix[i, j] = 1.0
-            i += 1
-            j += 1
+            cart2harm_matrix[i, j] = 1
         elif st == 3:  # P shell
-            cart2harm_matrix[i : i + 3, j : j + 3] = np.eye(3)
-            i += 3
-            j += 3
+            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = np.eye(3)
         elif st == 4:  # D shell
-            cart2harm_matrix[i : i + 5, j : j + 6] = cart2harm_per_shelltype[st][:5, :]
+            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
             constraint = np.zeros([1, Nvalence_cartbasfn])
-            constraint[:, j : j + 6] = cart2harm_per_shelltype[st][5:, :]
+            constraint[:, j : j + n_cart] = cart2harm_map[st][n_harm:]
             cart2harm_constraint += [constraint]
-            i += 5
-            j += 6
-
         elif st == 5:  # F shell
-            cart2harm_matrix[i : i + 7, j : j + 10] = cart2harm_per_shelltype[st][:7, :]
+            cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
             constraint = np.zeros([3, Nvalence_cartbasfn])
-            constraint[:, j : j + 10] = cart2harm_per_shelltype[st][7:, :]
+            constraint[:, j : j + n_cart] = cart2harm_map[st][n_harm:]
             cart2harm_constraint += [constraint]
-            i += 7
-            j += 10
+        i += n_harm
+        j += n_cart
 
 assert i == Nharmbasfns
 assert j == Nvalence_cartbasfn
