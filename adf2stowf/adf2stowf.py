@@ -234,7 +234,7 @@ class ADFToStoWF:
         molorb_eigenvalue = np.array(molorb_eigenvalue)
         molorb_cart_coeff = np.array(molorb_cart_coeff)
         if molorb_cart_coeff.ndim == 1:
-            molorb_cart_coeff = molorb_cart_coeff.reshape(1, -1)
+            molorb_cart_coeff = molorb_cart_coeff.reshape(-1, 1)
 
         occupied = molorb_occupation[:] == 1
         occidx = molorb_eigenvalue[occupied]
