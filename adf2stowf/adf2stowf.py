@@ -1,8 +1,4 @@
 #!/usr/bin/env python3.9
-# (C) 2008 Norbert Nemec
-# This file is part of the CASINO distribution.
-# Permission is given to use the script along with the CASINO program and modify
-# it for personal use.
 
 import sys
 
@@ -387,7 +383,7 @@ class ADFToStoWF:
     def setup_stowfn(self):
         self.sto = stowfn.StoWfn()
         self.sto.num_atom = self.Natoms
-        (self.sto.title,) = self.General['title']
+        self.sto.title = self.General['title'][0]
         self.sto.code = 'ADF'
         self.sto.periodicity = 0
         self.sto.spin_unrestricted = not self.spin_restricted
