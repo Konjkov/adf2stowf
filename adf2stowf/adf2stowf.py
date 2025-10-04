@@ -23,49 +23,46 @@ np.set_printoptions(
 PLOT_CUSPS, CUSP_METHOD, DO_DUMP, CART2HARM_PROJECTION, ONLY_OCCUPIED = cli_main.main()
 
 ############
-
+# https://www.scm.com/doc/ADF/kf_defs.html
 parser = adfread.AdfParser('TAPE21.asc')
-data = parser.parse()
+data = parser.parse()  # Main data sections from the parsed ADF TAPE21 file
 if DO_DUMP:
     parser.write_dump('TAPE21.txt')
 
-############
+General = data['General']  # General run information: system size, spin, symmetry, etc.
+Geometry = data['Geometry']  # Atomic coordinates, atom types, charges, and molecular geometry info
+Properties = data['Properties']  # Computed properties like energy, dipole moment, eigenvalues, etc.
+Basis = data['Basis']  # Valence basis set definition: shell types, exponents, contraction coefficients
+Core = data['Core']  # Core basis functions (if any), typically used for frozen-core approximations
+Symmetry = data['Symmetry']  # Molecular symmetry information: point group, symmetry operations, etc.
 
-General = data['General']
-Geometry = data['Geometry']
-Properties = data['Properties']
-Basis = data['Basis']
-Core = data['Core']
-Symmetry = data['Symmetry']
-
-############
-
-(Nspins,) = General['nspin']
+Nspins = General['nspin'][0]  # Number of spin channels (1 for restricted, 2 for unrestricted)
 spin_restricted = Nspins == 1
 
-Nvalence_electrons = int(General['electrons'][0])
+Nvalence_electrons = int(General['electrons'][0])  # Total number of valence electrons in the system
 
-(Natoms,) = Geometry['nnuc']
-(Natomtypes,) = Geometry['ntyp']
-(Ndummies,) = Geometry['nr of dummy atoms']
-(Ndummytypes,) = Geometry['nr of dummy atomtypes']
+Natoms = Geometry['nnuc'][0]  # Number of real (non-dummy) atoms
+Natomtypes = Geometry['ntyp'][0]  # Number of unique atom types (chemical elements present)
+Ndummies = Geometry['nr of dummy atoms'][0]  # Number of dummy atoms (used for embedding or symmetry)
+Ndummytypes = Geometry['nr of dummy atomtypes'][0]  # Number of dummy atom types
 
-assert Geometry['nr of atoms'] == Natoms + Ndummies
-assert Geometry['nr of atomtypes'] == Natomtypes + Ndummytypes
+assert Geometry['nr of atoms'] == Natoms + Ndummies  # Total atoms = real + dummy
+assert Geometry['nr of atomtypes'] == Natomtypes + Ndummytypes  # Total atom types includes dummies
 
+# Index array mapping each atom (including dummies) to its atom type; subtract 1 for zero-based indexing
 atyp_idx = Geometry['fragment and atomtype index'].reshape(2, Natoms + Ndummies)[1, :] - 1
 assert len(atyp_idx) == Natoms + Ndummies
 assert np.all(0 <= atyp_idx[0:Natoms])
 assert np.all(atyp_idx[0:Natoms] < Natomtypes)
 assert np.all(Natomtypes <= atyp_idx[Natoms : Natoms + Ndummies])
 assert np.all(atyp_idx[Natoms : Natoms + Ndummies] < Natomtypes + Ndummytypes)
-atyp_idx = atyp_idx[:Natoms]
+atyp_idx = atyp_idx[:Natoms]  # Keep only indices for real atoms (discard dummies)
 
+# Total charge per atom type — should correspond to atomic number for real atoms
 total_charge_per_atomtype = Geometry['atomtype total charge']
 atomicnumber_per_atomtype = np.array([int(c) for c in total_charge_per_atomtype])
-assert np.all(atomicnumber_per_atomtype[Natomtypes:] == 0)
+assert np.all(atomicnumber_per_atomtype[Natomtypes:] == 0)  # Dummy atom types have zero charge
 
-#####################
 #####################
 
 Nharmpoly_per_shelltype = np.array([0, 1, 4, 3, 5, 7])
@@ -128,9 +125,10 @@ cart2harm_map = {st: np.linalg.inv(M) for st, M in harm2cart_map.items()}
 # Valence basis set #
 #####################
 
-(nbset,) = Basis['nbset']
-(nbos,) = Basis['nbos']
-nbaspt = Basis['nbaspt'] - 1
+nbset = Basis['nbset'][0]  # Total number of function sets (not counting spherical/cartesian components)
+nbos = Basis['nbos'][0]  # The total number of Cartesian basis functions, not counting the copies of
+# the functions on the different atoms of the atom type
+nbaspt = Basis['nbaspt'] - 1  # Cumulative number of functions per atom type.
 assert nbaspt[0] == 0
 assert nbaspt[-1] == nbset
 
@@ -141,9 +139,9 @@ Nvalence_shells_per_centre = Nvalence_shells_per_atomtype[atyp_idx]
 
 ############
 
-nqbas = Basis['nqbas']
-lqbas = Basis['lqbas']
-alfbas = Basis['alfbas']
+nqbas = Basis['nqbas']  # Principal quantum number n for each STO shell (e.g., n=2 for 2p)
+lqbas = Basis['lqbas']  # Azimuthal quantum number l for each STO shell (s=0, p=1, d=2, ...)
+alfbas = Basis['alfbas']  # Zeta (ζ) exponent parameter of the Slater-type orbital: χ ~ r^(n-1) exp(-ζ*r)
 assert len(nqbas) == nbset
 assert len(lqbas) == nbset
 assert len(alfbas) == nbset
@@ -164,7 +162,7 @@ valence_zeta_per_atomtype = [valence_zeta[nbaspt[a] : nbaspt[a + 1]] for a in ra
 
 #############
 
-nbptr = Basis['nbptr'] - 1
+nbptr = Basis['nbptr'] - 1  # Index array of the nbos functions, where the entries are the cumulative numbers of functions.
 assert nbptr[0] == 0
 assert nbptr[-1] == nbos
 
@@ -176,7 +174,7 @@ assert np.sum(Nvalence_cartbasfn_per_centre) == Basis['naos']
 
 #############
 
-bnorm = Basis['bnorm']
+bnorm = Basis['bnorm']  # Normalization factors for the nbos Cartesian STO basis functions.
 assert len(bnorm) == nbos
 
 valence_cartnorm = bnorm
@@ -186,7 +184,7 @@ valence_cartnorm_per_atomtype = [valence_cartnorm[nbptr[a] : nbptr[a + 1]] for a
 # Core basis set
 #################
 
-(ncset,) = Core['ncset']
+ncset = Core['ncset'][0]
 ncorpt = Core['ncorpt'] - 1
 assert ncorpt[0] == 0
 assert ncorpt[-1] == ncset
@@ -266,7 +264,7 @@ Nvalence_cartbasfn = np.sum(Nvalence_cartbasfn_per_centre)
 # valence orbitals #
 ####################
 
-(nsym,) = Symmetry['nsym']
+nsym = Symmetry['nsym'][0]
 symlab = Symmetry['symlab']
 assert len(symlab) == nsym
 norb = Symmetry['norb']
@@ -382,16 +380,25 @@ if ONLY_OCCUPIED:
 cart2harm_matrix = np.zeros((Nharmbasfns, Nvalence_cartbasfn))
 cart2harm_constraint = np.zeros((Nvalence_cartbasfn - Nharmbasfns, Nvalence_cartbasfn))
 i, j = 0, 0
-for c in range(Natoms):
-    at = atyp_idx[c]
+for atom in range(Natoms):
+    at = atyp_idx[atom]
     for st in core_shelltype_per_atomtype[at]:
         i += Nharmpoly_per_shelltype[st]
-    for st in valence_shelltype_per_atomtype[at]:
+    for shell in range(Nvalence_shells_per_atomtype[at]):
+        st = valence_shelltype_per_atomtype[at][shell]
         n_harm = Nharmpoly_per_shelltype[st]
         n_cart = Ncartpoly_per_shelltype[st]
         cart2harm_matrix[i : i + n_harm, j : j + n_cart] = cart2harm_map[st][:n_harm]
         if n_cart > n_harm:  # D & F shell
-            cart2harm_constraint[j - i : j - i + n_cart - n_harm, j : j + n_cart] = cart2harm_map[st][n_harm:]
+            constraint = cart2harm_map[st][n_harm:]
+            cart2harm_constraint[j - i : j - i + n_cart - n_harm, j : j + n_cart] = constraint
+            violation = sum(np.linalg.norm(constraint @ molorb_cart_coeff[spin][:, j : j + n_cart].T) for spin in range(Nspins))
+            if violation > 1e-5:
+                print(f'WARNING: cartesian to spherical conversion for atom {atom}, shell type {st} violated by {violation:.8f}')
+                # Nvalence_shells_per_centre[at] += 1
+                current_order_r = valence_order_r_per_atomtype[at][shell] + 2
+                current_zeta = valence_zeta_per_atomtype[at][shell]
+                print(f'with r_order {current_order_r} and zeta: {current_zeta}')
         i += n_harm
         j += n_cart
 
