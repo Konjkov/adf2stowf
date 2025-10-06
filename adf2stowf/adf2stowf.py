@@ -1,10 +1,10 @@
 #!/usr/bin/env python3.9
 
-import sys
+import argparse
 
 import numpy as np
 
-from adf2stowf import adfread, cli_main, stowfn
+from adf2stowf import adfread, stowfn
 
 np.set_printoptions(
     suppress=True,
@@ -15,14 +15,19 @@ np.set_printoptions(
 
 
 class ADFToStoWF:
-    def __init__(self):
-        self.PLOT_CUSPS, self.CUSP_METHOD, self.DO_DUMP, self.CART2HARM_PROJECTION, self.ONLY_OCCUPIED = cli_main.main()
+    def __init__(self, plot_cusps, cusp_method, do_dump, cart2harm_projection, only_occupied):
+        """Initialize the ADFToStoWF object."""
+        self.PLOT_CUSPS = plot_cusps
+        self.CUSP_METHOD = cusp_method
+        self.DO_DUMP = do_dump
+        self.CART2HARM_PROJECTION = cart2harm_projection
+        self.ONLY_OCCUPIED = only_occupied
         self.parser = adfread.AdfParser('TAPE21.asc')
         self.data = self.parser.parse()
         self.initialize_data()
 
     def initialize_data(self):
-        # Main data sections from the parsed ADF TAPE21 file
+        """Main data sections from the parsed ADF TAPE21 file"""
         if self.DO_DUMP:
             self.parser.write_dump('TAPE21.txt')
 
@@ -59,8 +64,17 @@ class ADFToStoWF:
         self.Nharmpoly_per_shelltype = np.array([0, 1, 4, 3, 5, 7])
         self.Ncartpoly_per_shelltype = np.array([0, 1, 0, 3, 6, 10])
         self.harm2cart_map = {
+            # S-shell:
             1: np.eye(1),
+            # P-shell:
             3: np.eye(3),
+            # from CASINO/stowfdet.f90 code:
+            #   poly(5)=xy         D(-2)
+            #   poly(6)=yz         D(-1)
+            #   poly(7)=xz         D( 1)
+            #   poly(8)=2zz-xx-yy  D( 0)
+            #   poly(9)=xx-yy      D( 2)
+            #                      S
             4: np.array([
                 [0, 0, 0, -1,  1, 1],
                 [1, 0, 0,  0,  0, 0],
@@ -69,6 +83,18 @@ class ADFToStoWF:
                 [0, 1, 0,  0,  0, 0],
                 [0, 0, 0,  2,  0, 1],
             ]),
+            # F-shell:
+            # from CASINO/stowfdet.f90 code:
+            #    poly(10)=2zzz-3(xxz+yyz)  F( 0)
+            #    poly(11)=4xzz-(xx+yy)*x   F( 1)
+            #    poly(12)=4yzz-(xx+yy)*y   F(-1)
+            #    poly(13)=(xx-yy)*z        F( 2)
+            #    poly(14)=xyz              F(-2)
+            #    poly(15)=xxx-3xyy         F( 3)
+            #    poly(16)=3xx-yyy          F(-3)
+            #                              P_x
+            #                              P_y
+            #                              P_z
             5: np.array([
                 [ 0, -1,  0,  0, 0,  1,  0, 1, 0, 0],
                 [ 0,  0, -1,  0, 0,  0,  3, 0, 1, 0],
@@ -191,66 +217,81 @@ class ADFToStoWF:
         self.norb = self.Symmetry['norb']
         assert len(self.symlab) == self.nsym
         assert len(self.norb) == self.nsym
-
+        # Loop over all symmetries
         for sym in range(self.nsym):
             Section = self.data[self.symlab[sym]]
+            # Number of orbitals for this spin and symmetry
             nmo_X = Section['nmo_' + X][0]
             assert nmo_X == self.norb[sym]
+            # Fractional occupations for each orbital
             froc_X = Section['froc_' + X]
             assert len(froc_X) == self.norb[sym]
+            # Skip this symmetry only when we want only occupied orbitals
             if np.all(froc_X == 0.0) and self.ONLY_OCCUPIED:
                 continue
+            # Indices of basis functions for this symmetry
             npart = Section['npart'] - 1
+            # Extract molecular orbital coefficients and eigenvalue
             Eigen_Bas_X = Section['Eigen-Bas_' + X].reshape([nmo_X, len(npart)])
             eps_X = Section['eps_' + X].reshape([nmo_X])
+            # Loop over all orbitals
             for o in range(nmo_X):
                 eigv = eps_X[o]
                 occ = froc_X[o]
                 molorb_eigenvalue.append(eigv)
+                # Add any leftover partial occupation for this eigenvalue
                 if eigv in partial_occupations:
                     occ += partial_occupations.pop(eigv)
                 coeff = np.zeros(shape=(self.Nvalence_cartbasfn,))
                 coeff[npart] = Eigen_Bas_X[o]
+                # Check if orbital is considered "occupied"
                 if occ + 1e-8 >= 2.0 / self.Nspins:
                     molorb_occupation.append(1)
                     occ -= 2.0 / self.Nspins
+                    # Construct coefficient vector in Cartesian basis
                     molorb_cart_coeff.append(coeff)
                 else:
                     molorb_occupation.append(0)
                     if not self.ONLY_OCCUPIED:
                         molorb_cart_coeff.append(coeff)
+                # Store leftover fractional occupation
                 if occ > 1e-8:
                     partial_occupations[eigv] = occ
-
+        # Print any leftover partial occupations
         for k, v in partial_occupations.items():
             print('spin=', sp, ': leftover partial occupation at E=', k, ': ', v)
         assert len(partial_occupations) == 0
-
+        # Convert lists to NumPy arrays
         molorb_occupation = np.array(molorb_occupation)
         molorb_eigenvalue = np.array(molorb_eigenvalue)
         molorb_cart_coeff = np.array(molorb_cart_coeff)
+        # Ensure 2D shape even if only one orbital exists (e.g., hydrogen)
         if molorb_cart_coeff.ndim == 1:
             molorb_cart_coeff = molorb_cart_coeff.reshape(-1, 1)
-
+        # Identify occupied and unoccupied orbitals
         occupied = molorb_occupation[:] == 1
         occidx = molorb_eigenvalue[occupied]
         unoccidx = molorb_eigenvalue[~occupied]
+        # Check HOMO-LUMO ordering (warning if HOMO > LUMO)
         if len(occidx) > 0 and len(unoccidx) > 0:
             HOMO = max(occidx)
             LUMO = min(unoccidx)
             if HOMO > LUMO:
                 print('Warning: HOMO > LUMO (may happen in some cases)')
-
         if self.ONLY_OCCUPIED:
+            # Keep only occupied eigenvalues
             molorb_eigenvalue = molorb_eigenvalue[occupied]
+            # Number of occupied valence orbitals
             self.Nmolorbs_occup = len(molorb_cart_coeff)
+            # Sanity check: number of orbitals matches number of coefficients
             assert len(molorb_eigenvalue) == self.Nmolorbs_occup
             assert np.sum(molorb_occupation) == self.Nmolorbs_occup
         else:
             self.Nmolorbs_total = len(molorb_eigenvalue)
+            # when returning all orbitals, ensure we have coefficients for each eigenvalue appended
             assert molorb_cart_coeff.shape[0] == self.Nmolorbs_total
-
         order = molorb_eigenvalue.argsort()
+        # Sort orbitals by eigenvalue
         return molorb_cart_coeff[order]
 
     def process_coefficients(self):
@@ -300,16 +341,24 @@ class ADFToStoWF:
                     print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
         if self.CART2HARM_PROJECTION:
+            # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
             from scipy.linalg import null_space
 
+            # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
             A = self.cart2harm_constraint
-            Q = null_space(A)
-            P = Q @ Q.T
+            # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
+            Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
+            P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
+            # Apply projection to each molecular orbital
             for sp in range(self.Nspins):
                 for m in range(self.Nvalence_molorbs[sp]):
+                    # Original Cartesian orbital coefficient vector
                     C = self.molorb_cart_coeff[sp][m, :].copy()
+                    # Project onto pure spherical harmonic subspace
                     C_proj = P @ C
+                    # Overwrite with projected coefficients
                     self.molorb_cart_coeff[sp][m, :] = C_proj
+                    # Verify constraint satisfaction: should be numerically zero
                     violation = A @ C_proj
                     absviolation = np.linalg.norm(violation)
                     if absviolation > 1e-10:
@@ -328,9 +377,9 @@ class ADFToStoWF:
         self.Ncore_molorbs = self.Ncoremolorbs_per_centre.sum()
         self.core_molorb_coeff = np.zeros((self.Nharmbasfns, self.Ncore_molorbs))
         molorb = 0
-        for a in range(self.Natoms):
-            at = self.atyp_idx[a]
-            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:a])
+        for atom in range(self.Natoms):
+            at = self.atyp_idx[atom]
+            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:atom])
             Ncore_harmbasfns = np.sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
             core_coeff = np.zeros([Ncore_harmbasfns])
             ccor_per_shell = np.array_split(self.ccor_per_atomtype[at], np.cumsum((self.nrcset * self.nrcorb)[at, :]))[:-1]
@@ -361,7 +410,7 @@ class ADFToStoWF:
                 for i in range(7):
                     core_coeff[:] = 0.0
                     offset = self.nrcset[at, 0] + self.nrcset[at, 1] + self.nrcset[at, 2]
-                    core_coeff[offset + i : offset + self.nrcset[at, 2] * 7 : 7] = ccor_per_shell[3][
+                    core_coeff[offset + i : offset + self.nrcset[at, 3] * 7 : 7] = ccor_per_shell[3][
                         self.nrcset[at, 3] * shell : self.nrcset[at, 3] * (shell + 1)
                     ]
                     self.core_molorb_coeff[first_harmbasfn : first_harmbasfn + Ncore_harmbasfns, molorb] = core_coeff
@@ -447,6 +496,7 @@ class ADFToStoWF:
                     assert np.all(np.abs(constraint_violation) < 1e-8)
 
         if self.PLOT_CUSPS:
+            # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
             self.z = np.linspace(-0.5, 0.5, 501)
             r = [np.zeros((3, len(self.z))) + self.sto.atompos[at, :][:, None] for at in range(self.sto.num_atom)]
             for ir in r:
@@ -470,13 +520,13 @@ class ADFToStoWF:
     def plot_cusps(self):
         if not self.PLOT_CUSPS:
             return
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError:
-            print('The PLOT_CUSPS feature requires the matplotlib library, which could not be found.')
-            sys.exit()
+        import matplotlib.pyplot as plt
 
+        # Create a 2 x Natom grid of subplots
+        # Top row: wavefunction values (val)
+        # Bottom row: local energies (eloc)
         fig, axes = plt.subplots(2, self.sto.num_atom, figsize=(4 * self.sto.num_atom, 4))
+        # If only one atom, reshape axes into 2D array for consistency
         if self.sto.num_atom == 1:
             axes = np.array([axes]).reshape(2, 1)
         axval = [axes[0, at] for at in range(self.sto.num_atom)]
@@ -487,26 +537,34 @@ class ADFToStoWF:
             eloc_max = -1e8
             for sp in range(self.Nspins):
                 for i in range(np.sum(self.fixed[sp])):
-                    vpre = self.val_pre[at][sp][:, i]
-                    vpost = self.val_post[at][sp][:, i]
-                    sgn = np.sign(vpre[len(vpre) // 2])
+                    vpre = self.val_pre[at][sp][:, i]  # wavefunction before correction
+                    vpost = self.val_post[at][sp][:, i]  # wavefunction after correction
+                    sgn = np.sign(vpre[len(vpre) // 2])  # sign normalization
+                    # Plot wavefunction before and after correction
                     (pl,) = axval[at].plot(self.z, sgn * vpre, '--')
                     axval[at].plot(self.z, sgn * vpost, '-', color=pl.get_color())
+                    # Compute local energy before and after correction:
+                    # E_loc = -0.5 * (Laplacian / wavefunction) - Z / |r|
                     eloc_pre = -0.5 * self.lap_pre[at][sp][:, i] / self.val_pre[at][sp][:, i] - self.sto.atomnum[at] / np.abs(self.z)
                     eloc_post = -0.5 * self.lap_post[at][sp][:, i] / self.val_post[at][sp][:, i] - self.sto.atomnum[at] / np.abs(self.z)
+                    # Plot local energy before and after correction
                     axeloc[at].plot(self.z, eloc_pre, '--', color=pl.get_color())
                     axeloc[at].plot(self.z, eloc_post, '-', color=pl.get_color())
+                    # Track min/max values for axis scaling
                     eloc_min = min(eloc_min, eloc_post[0], eloc_post[-1], eloc_post[len(eloc_post) // 2 - 1], eloc_post[len(eloc_post) // 2 + 1])
                     eloc_max = max(eloc_min, eloc_post[0], eloc_post[-1], eloc_post[len(eloc_post) // 2 - 1], eloc_post[len(eloc_post) // 2 + 1])
+            # Expand y-limits around the middle value for better visualization
             eloc_mid = (eloc_min + eloc_max) / 2
             eloc_min = (eloc_min - eloc_mid) * 1.5 + eloc_mid
             eloc_max = (eloc_max - eloc_mid) * 1.5 + eloc_mid
+            # Set axis ranges
             axval[at].set_xlim(self.z[0], self.z[-1])
             axeloc[at].set_xlim(self.z[0], self.z[-1])
             axeloc[at].set_ylim(eloc_min, eloc_max)
+            # Add titles
             axval[at].set_title(f'Atom {at+1} (Z={self.sto.atomnum[at]}): Wavefunction')
             axeloc[at].set_title(f'Atom {at+1}: Local Energy')
-
+        # Adjust layout and save figure
         fig.tight_layout()
         fig.savefig('cusp_constraint.svg')
 
@@ -523,7 +581,58 @@ class ADFToStoWF:
 
 
 def main():
-    adf_to_stowf = ADFToStoWF()
+    """Entry point."""
+    parser = argparse.ArgumentParser(
+        description='Convert ADF TAPE21.asc to CASINO stowfn.data',
+        epilog="""
+        Examples:
+          %(prog)s                              # use default: --cusp-method=enforce
+          %(prog)s --plot-cusps                 # enable cusp plotting
+          %(prog)s --cusp-method=enforce        # apply transformation to satisfy cusps (default)
+          %(prog)s --cusp-method=project        # project out cusp-violating components
+          %(prog)s --cusp-method=none           # disable any cusp correction
+          %(prog)s --dump                       # generate a text dump of the parsed data
+          %(prog)s --cart2harm-projection       # enforce pure spherical harmonics via projection
+          %(prog)s --all-orbitals               # include also virtual orbitals (default: only occupied)
+          %(prog)s --cusp-method=project --dump
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    parser.add_argument(
+        '--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps (e.g., density derivative at nuclei) (default: False)'
+    )
+
+    parser.add_argument(
+        '--cusp-method',
+        choices=['enforce', 'project', 'none'],
+        default='enforce',
+        help="""
+            Choose how to handle nuclear cusp conditions:
+            - enforce  : apply linear transformation to satisfy cusps (default)
+            - project  : remove components that violate cusp conditions via projection
+            - none     : do not apply any cusp correction
+        """.strip(),
+    )
+
+    parser.add_argument(
+        '--cart2harm-projection',
+        action='store_true',
+        help="""
+                Enforce conversion from Cartesian to pure spherical harmonic Gaussian basis functions
+                via orthogonal projection. Removes non-spherical components (e.g., s-type contamination
+                in d/f shells like x²+y²+z²) that violate angular momentum purity. This ensures physical
+                consistency but may change total energy if original orbitals contained such contamination.
+            """.strip(),
+    )
+
+    parser.add_argument('--all-orbitals', action='store_true', default=False, help='If set, include also virtual orbitals (default: only occupied).')
+
+    parser.add_argument('--dump', action='store_true', help='Generate a text dump (.txt) of the parsed ADF data for debugging (default: False)')
+
+    args = parser.parse_args()
+
+    adf_to_stowf = ADFToStoWF(args.plot_cusps, args.cusp_method, args.dump, args.cart2harm_projection, not args.all_orbitals)
     adf_to_stowf.run()
 
 
