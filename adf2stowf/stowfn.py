@@ -7,6 +7,7 @@
 
 import inspect
 import sys
+from math import factorial, sqrt
 
 import numpy as np
 from scipy.linalg import null_space
@@ -626,24 +627,12 @@ class StoWfn:
         writeline('----------------------------')
         writeline('GS')
         writeline()
-
-        if hasattr(self, 'coeff_norm'):
-            writeline('ORBITAL COEFFICIENTS (normalized AO)')
-            writeline('------------------------------------')
-            coeff = self.coeff_norm[0][:, :] / self.get_norm()[None, :]
-            writefloats(coeff.reshape((self.num_molorbs[0] * self.num_atorbs)))
-            if self.spin_unrestricted:
-                coeff = self.coeff_norm[1][:, :] / self.get_norm()[None, :]
-                writefloats(coeff.reshape((self.num_molorbs[1] * self.num_atorbs)))
-            writeline()
-        elif hasattr(self, 'coeff'):
-            writeline('ORBITAL COEFFICIENTS (normalized AO)')
-            writeline('------------------------------------')
-            writefloats(self.coeff[0].reshape((self.num_molorbs[0] * self.num_atorbs)))
-            if self.spin_unrestricted:
-                writefloats(self.coeff[1].reshape((self.num_molorbs[1] * self.num_atorbs)))
-            writeline()
-
+        writeline('ORBITAL COEFFICIENTS (normalized AO)')
+        writeline('------------------------------------')
+        writefloats(self.coeff[0].reshape((self.num_molorbs[0] * self.num_atorbs)))
+        if self.spin_unrestricted:
+            writefloats(self.coeff[1].reshape((self.num_molorbs[1] * self.num_atorbs)))
+        writeline()
         f.writelines(self.footer)
         f.close()
 
@@ -722,7 +711,7 @@ class StoWfn:
         weave_inline(support_code, eval_code, dict, ['EVAL_ATORBS'])
         return atorbs
 
-    def get_norm(self):
+    def get_norm_weave(self):
         """Compute normalization factors for atomic orbitals.
 
         Returns:
@@ -731,6 +720,69 @@ class StoWfn:
         norm = np.zeros((self.num_atorbs,))
         dict = mapunion(self.__dict__, locals())
         weave_inline(support_code, norm_code, dict)
+        return norm
+
+    def get_norm(self):
+        """Compute normalization factors for atomic orbitals."""
+
+        pi = np.pi
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+        polypow = np.array([0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+        # normalization table for polynomials
+        polynorm = np.zeros(25)
+        # S-shell:
+        polynorm[0] = sqrt(1.0 / (4.0 * pi))  # 1
+        # P-shell:
+        polynorm[1] = sqrt(3.0 / (4.0 * pi))  # x
+        polynorm[2] = sqrt(3.0 / (4.0 * pi))  # y
+        polynorm[3] = sqrt(3.0 / (4.0 * pi))  # z
+        # D-shell:
+        polynorm[4] = 0.5 * sqrt(15.0 / pi)  # xy
+        polynorm[5] = 0.5 * sqrt(15.0 / pi)  # yz
+        polynorm[6] = 0.5 * sqrt(15.0 / pi)  # zx
+        polynorm[7] = 0.25 * sqrt(5.0 / pi)  # 3zz - r^2
+        polynorm[8] = 0.25 * sqrt(15.0 / pi)  # xx - yy
+        # F-shell:
+        polynorm[9] = 0.25 * sqrt(7.0 / pi)  # (2*zz-3*(xx+yy))*z
+        polynorm[10] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*x
+        polynorm[11] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*y
+        polynorm[12] = 0.25 * sqrt(105.0 / pi)  # (xx-yy)*z
+        polynorm[13] = 0.5 * sqrt(105.0 / pi)  # xy*z
+        polynorm[14] = 0.25 * sqrt(17.5 / pi)  # (xx-3.0*yy)*x
+        polynorm[15] = 0.25 * sqrt(17.5 / pi)  # (3.0*xx-yy)*y
+        # G-shell:
+        polynorm[16] = 0.1875 * sqrt(1.0 / pi)  # 35zzzz-30zzrr+3rrrr
+        polynorm[17] = 0.75 * sqrt(2.5 / pi)  # xz(7zz-3rr)
+        polynorm[18] = 0.75 * sqrt(2.5 / pi)  # yz(7zz-3rr)
+        polynorm[19] = 0.375 * sqrt(5.0 / pi)  # (xx-yy)(7zz-rr)
+        polynorm[20] = 0.75 * sqrt(5.0 / pi)  # xy(7zz-rr)
+        polynorm[21] = 0.75 * sqrt(17.5 / pi)  # xz(xx-3yy)
+        polynorm[22] = 0.75 * sqrt(17.5 / pi)  # yz(3xx-yy)
+        polynorm[23] = 0.1875 * sqrt(35.0 / pi)  # xxxx-6xxyy+yyyy
+        polynorm[24] = 0.75 * sqrt(35.0 / pi)  # xxxy-xyyy
+
+        norm = np.zeros(self.num_atorbs)
+        n_shell = n_atorb = 0
+
+        # main double loop over centers and shells
+        for centre in range(self.num_centres):
+            for shell in range(self.num_shells_on_centre[centre]):
+                nshell = n_shell
+                shelltype = self.shelltype[nshell]
+                order_r = self.order_r_in_shell[nshell]
+                zeta = self.zeta[nshell]
+
+                first_poly = first_poly_in_shell_type[shelltype]
+                num_poly = num_poly_in_shell_type[shelltype]
+
+                for pl in range(first_poly, first_poly + num_poly):
+                    n = polypow[pl] + order_r + 1
+                    norm[n_atorb] = polynorm[pl] * (2 * zeta) ** n * sqrt(2 * zeta / factorial(2 * n))
+                    n_atorb += 1
+
+                n_shell += 1
+
         return norm
 
     def iter_atorbs(self):
@@ -744,12 +796,11 @@ class StoWfn:
                 - N: radial order
                 - pl: polynomial index within shell
         """
-        nshell = 0
-        atorb = 0
+        atorb = nshell = 0
         for centre in range(self.num_centres):
             for _shell in range(self.num_shells_on_centre[centre]):
                 for pl in range(num_orbs_per_shelltype[self.shelltype[nshell]]):
-                    yield (atorb, centre, nshell, self.order_r_in_shell[nshell], pl)
+                    yield atorb, centre, nshell, self.order_r_in_shell[nshell], pl
                     atorb += 1
                 nshell += 1
 
@@ -828,5 +879,5 @@ if __name__ == '__main__':
     val, grad, lap = sto.eval_molorb_derivs(points)
     print('grad analytic:', grad[:, 0])
     print('grad numeric:', (val[1:] - val[0]) / 0.00317100)
-#    print sto.get_norm()
-#    sto.writefile("stowfn.data.out")
+    print('norm:', sto.get_norm())
+    sto.writefile('stowfn.data.out')
