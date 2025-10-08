@@ -652,7 +652,7 @@ class StoWfn:
             else:
                 raise "unknown block starting with '" + l[start] + "'"
 
-    def eval_molorbs(self, pos, spin=0):
+    def eval_molorbs_weave(self, pos, spin=0):
         """Evaluate molecular orbitals at given positions.
 
         Args:
@@ -669,6 +669,146 @@ class StoWfn:
         coeff_norm = self.coeff_norm[spin]
         dict = mapunion(self.__dict__, locals())
         weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS'])
+        return val
+
+    def eval_molorbs(self, pos, spin=0):
+        """Evaluate molecular orbitals at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
+
+        Returns:
+            numpy.ndarray: Values of molecular orbitals (num_points, num_molorbs).
+        """
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points), 'pos must be of shape (3, num_points)'
+
+        num_molorbs = self.num_molorbs[spin]
+        coeff_norm = self.coeff_norm[spin]  # Shape: (num_molorbs, num_atorbs)
+
+        # Output: MO values at each point
+        val = np.zeros((num_points, num_molorbs))
+
+        # Shell type to number of functions and first polynomial index
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Cutoff for exp(-zeta*r) to avoid underflow
+        sto_exp_cutoff = 746.0
+
+        # Loop over each evaluation point
+        for pt in range(num_points):
+            x_pt, y_pt, z_pt = pos[:, pt]
+
+            ao_vals = np.zeros(self.num_atorbs)  # AO values at this point
+            iao = 0  # atomic orbital counter
+
+            # Loop over centres
+            for centre in range(self.num_centres):
+                # Vector from centre to point
+                dx = x_pt - self.centrepos[centre, 0]
+                dy = y_pt - self.centrepos[centre, 1]
+                dz = z_pt - self.centrepos[centre, 2]
+                r = np.sqrt(dx * dx + dy * dy + dz * dz)
+
+                # Compute radial powers up to max needed order
+                max_order = self.max_order_r_on_centre[centre]
+                r_powers = np.ones(max_order + 1)
+                for n in range(1, max_order + 1):
+                    r_powers[n] = r_powers[n - 1] * r
+
+                # Angular polynomials (up to g-type)
+                poly = np.zeros(25)
+                poly[0] = 1.0
+                poly[1] = dx
+                poly[2] = dy
+                poly[3] = dz
+
+                shelltype_max = self.max_shell_type_on_centre[centre]
+
+                if shelltype_max >= 4:  # d or higher
+                    xy = dx * dy
+                    yz = dy * dz
+                    zx = dz * dx
+                    xx = dx * dx
+                    yy = dy * dy
+                    zz = dz * dz
+                    rr = r * r
+
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zz - rr
+                    poly[8] = xx - yy
+
+                    if shelltype_max >= 5:  # f or higher
+                        t1 = 5 * zz - rr
+                        poly[9] = (2 * zz - 3 * (xx + yy)) * dz
+                        poly[10] = t1 * dx
+                        poly[11] = t1 * dy
+                        poly[12] = (xx - yy) * dz
+                        poly[13] = xy * dz
+                        poly[14] = (xx - 3 * yy) * dx
+                        poly[15] = (3 * xx - yy) * dy
+
+                        if shelltype_max >= 6:  # g shells
+                            xx_yy3 = xx - 3 * yy
+                            xx3_yy = 3 * xx - yy
+                            xx_yy = xx - yy
+                            zz5 = 5 * zz
+                            zz7 = 7 * zz
+                            rr3 = 3 * rr
+                            zz7_rr = zz7 - rr
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * zz7_rr3 - (zz5 - rr) * rr3  # 35zzzz - 30zzrr + 3rrrr
+                            poly[17] = zx * zz7_rr3  # xz(7zz - 3rr)
+                            poly[18] = yz * zz7_rr3  # yz(7zz - 3rr)
+                            poly[19] = xx_yy * zz7_rr  # (xx-yy)(7zz-rr)
+                            poly[20] = xy * zz7_rr  # xy(7zz-rr)
+                            poly[21] = zx * xx_yy3  # xz(xx-3yy)
+                            poly[22] = yz * xx3_yy  # yz(3xx-yy)
+                            poly[23] = xx * xx_yy3 - yy * xx3_yy  # xxxx - 6xxyy + yyyy
+                            poly[24] = xy * xx_yy  # xxxy - xyyy
+
+                # Process each shell on this centre
+                start_shell = self.idx_first_shell_on_centre[centre]
+                end_shell = self.idx_first_shell_on_centre[centre + 1]
+
+                for ishell in range(start_shell, end_shell):
+                    stype = self.shelltype[ishell]
+                    N_radial = self.order_r_in_shell[ishell]
+                    zeta_val = self.zeta[ishell]
+
+                    zeta_r = zeta_val * r
+                    if zeta_r > sto_exp_cutoff:
+                        # Skip this shell — negligible contribution
+                        iao += num_poly_in_shell_type[stype]
+                        continue
+
+                    exp_factor = np.exp(-zeta_r)
+
+                    first_pl = first_poly_in_shell_type[stype]
+                    num_pl = num_poly_in_shell_type[stype]
+                    A = slice(first_pl, first_pl + num_pl)
+
+                    phi = poly[A] * exp_factor
+
+                    # Apply radial factor: r^N
+                    if N_radial <= max_order:
+                        radial_prefactor = r_powers[N_radial]
+                    else:
+                        radial_prefactor = r**N_radial
+
+                    # Store AO values
+                    for idx in range(num_pl):
+                        ao_vals[iao] = radial_prefactor * phi[idx]
+                        iao += 1
+
+            # Now compute MO values: sum over AOs: MO_j = sum_i coeff_norm[j,i] * AO_i
+            val[pt, :] = coeff_norm @ ao_vals  # Matrix-vector product
+
         return val
 
     def eval_molorb_derivs(self, pos, spin=0):
@@ -693,6 +833,230 @@ class StoWfn:
         coeff_norm = self.coeff_norm[spin]
         dict = mapunion(self.__dict__, locals())
         weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS', 'CALC_DERIVS'])
+        return val, grad, lap
+
+    def eval_molorb_derivs_python(self, pos, spin=0):
+        """
+        Pure Python version of eval_molorb_derivs with exact correspondence to the original weave code.
+        Now correctly uses self.coeff_norm[spin].
+        """
+        import numpy as np
+
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points), 'pos must be (3, num_points)'
+        num_molorbs = self.num_molorbs[spin]
+
+        # Output arrays
+        val = np.zeros((num_points, num_molorbs))
+        grad = np.zeros((3, num_points, num_molorbs))
+        lap = np.zeros((num_points, num_molorbs))
+
+        # Direct access to attributes (same names as in weave)
+        num_centres = self.num_centres
+        centrepos = self.centrepos
+        zeta = self.zeta
+        shelltype = self.shelltype
+        order_r_in_shell = self.order_r_in_shell
+        num_shells_on_centre = self.num_shells_on_centre
+        max_order_r_on_centre = self.max_order_r_on_centre
+        max_shell_type_on_centre = self.max_shell_type_on_centre
+
+        # Normalized MO coefficients for given spin
+        coeff_norm = self.coeff_norm[spin]  # <-- ИСПРАВЛЕНО: теперь определено
+
+        # Constants from original
+        sto_exp_cutoff = 746.0
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Precompute r array with index -1,0,1,...,max_order
+        max_max_order = max_order_r_on_centre.max()
+        r_size = max_max_order + 3  # indices: -1, 0, 1, ..., max_max_order
+        r_offset = 1  # r[i] stored at r_arr[i + r_offset]
+
+        for pt in range(num_points):
+            n_shell = 0
+            n_atorb = 0
+
+            for centre in range(num_centres):
+                x = pos[0, pt] - centrepos[centre, 0]
+                y = pos[1, pt] - centrepos[centre, 1]
+                z = pos[2, pt] - centrepos[centre, 2]
+                xx = x * x
+                yy = y * y
+                zz = z * z
+                r2 = xx + yy + zz
+                r = np.sqrt(r2) if r2 > 1e-16 else 0.0
+
+                # Build r array: r(-1), r(0), r(1), ..., r(max_order)
+                r_arr = np.zeros(r_size)
+                if max_order_r_on_centre[centre] > 0:
+                    r_arr[-1 + r_offset] = 1.0 / r if r > 1e-16 else 0.0
+                    r_arr[0 + r_offset] = 1.0
+                    r_arr[1 + r_offset] = r
+                    for i in range(2, max_order_r_on_centre[centre] + 1):
+                        r_arr[i + r_offset] = r_arr[i - 1 + r_offset] * r
+                else:
+                    r_arr[0 + r_offset] = 1.0
+                    r_arr[1 + r_offset] = r
+                    # higher terms unused
+
+                # Normalized direction
+                if r > 1e-16:
+                    x_norm = x / r
+                    y_norm = y / r
+                    z_norm = z / r
+                else:
+                    x_norm = y_norm = z_norm = 0.0
+
+                # Polynomials (index 0..24)
+                poly = np.zeros(25)
+                dpoly = np.zeros((3, 25))  # dpoly[dx][i], dpoly[dy][i], dpoly[dz][i]
+
+                poly[0] = 1.0
+                dpoly[:, 0] = 0.0
+
+                poly[1] = x
+                dpoly[0, 1] = 1.0
+                dpoly[1, 1] = 0.0
+                dpoly[2, 1] = 0.0
+                poly[2] = y
+                dpoly[0, 2] = 0.0
+                dpoly[1, 2] = 1.0
+                dpoly[2, 2] = 0.0
+                poly[3] = z
+                dpoly[0, 3] = 0.0
+                dpoly[1, 3] = 0.0
+                dpoly[2, 3] = 1.0
+
+                if max_shell_type_on_centre[centre] >= 4:
+                    xy = x * y
+                    yz = y * z
+                    zx = z * x
+
+                    poly[4] = xy
+                    dpoly[0, 4] = y
+                    dpoly[1, 4] = x
+                    dpoly[2, 4] = 0.0
+                    poly[5] = yz
+                    dpoly[0, 5] = 0.0
+                    dpoly[1, 5] = z
+                    dpoly[2, 5] = y
+                    poly[6] = zx
+                    dpoly[0, 6] = z
+                    dpoly[1, 6] = 0.0
+                    dpoly[2, 6] = x
+                    poly[7] = 3 * zz - r2
+                    dpoly[0, 7] = -2 * x
+                    dpoly[1, 7] = -2 * y
+                    dpoly[2, 7] = 6 * z
+                    poly[8] = xx - yy
+                    dpoly[0, 8] = 2 * x
+                    dpoly[1, 8] = -2 * y
+                    dpoly[2, 8] = 0.0
+
+                    if max_shell_type_on_centre[centre] >= 5:
+                        t1 = 5 * zz - r2
+
+                        poly[9] = (2 * zz - 3 * (xx + yy)) * z
+                        dpoly[0, 9] = -6 * z * x
+                        dpoly[1, 9] = -6 * z * y
+                        dpoly[2, 9] = 6 * zz - 3 * (xx + yy)
+
+                        poly[10] = t1 * x
+                        dpoly[0, 10] = t1 + (-2 * x) * x
+                        dpoly[1, 10] = (-2 * y) * x
+                        dpoly[2, 10] = (10 * z) * x
+
+                        poly[11] = t1 * y
+                        dpoly[0, 11] = (-2 * x) * y
+                        dpoly[1, 11] = t1 + (-2 * y) * y
+                        dpoly[2, 11] = (10 * z) * y
+
+                        poly[12] = (xx - yy) * z
+                        dpoly[0, 12] = 2 * z * x
+                        dpoly[1, 12] = -2 * z * y
+                        dpoly[2, 12] = xx - yy
+
+                        poly[13] = xy * z
+                        dpoly[0, 13] = y * z
+                        dpoly[1, 13] = x * z
+                        dpoly[2, 13] = x * y
+
+                        poly[14] = (xx - 3 * yy) * x
+                        dpoly[0, 14] = 3 * xx - 3 * yy
+                        dpoly[1, 14] = -6 * x * y
+                        dpoly[2, 14] = 0.0
+
+                        poly[15] = (3 * xx - yy) * y
+                        dpoly[0, 15] = 6 * x * y
+                        dpoly[1, 15] = 3 * xx - 3 * yy
+                        dpoly[2, 15] = 0.0
+
+                        if max_shell_type_on_centre[centre] >= 6:
+                            raise NotImplementedError('g-orbital derivatives not implemented')
+
+                # Loop over shells on this centre
+                for shell in range(num_shells_on_centre[centre]):
+                    sh_type = shelltype[n_shell]
+                    N = order_r_in_shell[n_shell]
+
+                    zeta_rabs = zeta[n_shell] * r
+                    if zeta_rabs > sto_exp_cutoff:
+                        n_atorb += num_poly_in_shell_type[sh_type]
+                        n_shell += 1
+                        continue
+
+                    exp_zeta_rabs = np.exp(-zeta_rabs)
+                    start_pl = first_poly_in_shell_type[sh_type]
+                    num_pl = num_poly_in_shell_type[sh_type]
+                    A = slice(start_pl, start_pl + num_pl)
+
+                    phi = poly[A] * exp_zeta_rabs
+                    dphi = np.zeros((3, num_pl))
+                    dphi[0, :] = dpoly[0, A] * exp_zeta_rabs - zeta[n_shell] * x_norm * phi
+                    dphi[1, :] = dpoly[1, A] * exp_zeta_rabs - zeta[n_shell] * y_norm * phi
+                    dphi[2, :] = dpoly[2, A] * exp_zeta_rabs - zeta[n_shell] * z_norm * phi
+
+                    # Laplacian of phi part
+                    ddphi = (
+                        -2 * zeta[n_shell] * r_arr[-1 + r_offset] * (x * dpoly[0, A] + y * dpoly[1, A] + z * dpoly[2, A] + poly[A])
+                        + zeta[n_shell] * zeta[n_shell] * poly[A]
+                    ) * exp_zeta_rabs
+
+                    # Radial factor r^N
+                    rN = r_arr[N + r_offset] if N <= max_order_r_on_centre[centre] else r**N
+
+                    for pl in range(num_pl):
+                        c = coeff_norm[:, n_atorb]  # Shape: (num_molorbs,)
+
+                        if N == 0:
+                            val[pt, :] += c * phi[pl]
+                            grad[0, pt, :] += c * dphi[0, pl]
+                            grad[1, pt, :] += c * dphi[1, pl]
+                            grad[2, pt, :] += c * dphi[2, pl]
+                            lap[pt, :] += c * ddphi[pl]
+                        else:
+                            # Handle r^(N-2): could be r(-1), r(0), etc.
+                            if N - 2 >= -1:
+                                rNm2 = r_arr[N - 2 + r_offset]
+                            else:
+                                rNm2 = r ** (N - 2) if r > 1e-16 else 0.0
+
+                            val[pt, :] += c * rN * phi[pl]
+                            grad[0, pt, :] += c * (N * x * rNm2 * phi[pl] + rN * dphi[0, pl])
+                            grad[1, pt, :] += c * (N * y * rNm2 * phi[pl] + rN * dphi[1, pl])
+                            grad[2, pt, :] += c * (N * z * rNm2 * phi[pl] + rN * dphi[2, pl])
+
+                            term1 = N * (N + 1) * rNm2 * phi[pl]
+                            term2 = 2 * N * rNm2 * (x * dphi[0, pl] + y * dphi[1, pl] + z * dphi[2, pl])
+                            term3 = rN * ddphi[pl]
+                            lap[pt, :] += c * (term1 + term2 + term3)
+
+                        n_atorb += 1
+
+                    n_shell += 1
+
         return val, grad, lap
 
     def eval_atorbs_weave(self, pos):
