@@ -695,7 +695,7 @@ class StoWfn:
         weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS', 'CALC_DERIVS'])
         return val, grad, lap
 
-    def eval_atorbs(self, pos):
+    def eval_atorbs_weave(self, pos):
         """Evaluate atomic orbitals (AOs) at given positions.
 
         Args:
@@ -709,6 +709,126 @@ class StoWfn:
         atorbs = np.zeros((num_points, self.num_atorbs))
         dict = mapunion(self.__dict__, locals())
         weave_inline(support_code, eval_code, dict, ['EVAL_ATORBS'])
+        return atorbs
+
+    def eval_atorbs(self, pos):
+        """
+        Evaluate atomic orbitals (AOs) at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+
+        Returns:
+            numpy.ndarray: AO values (num_points, num_atorbs).
+        """
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points), f'pos must have shape (3, {num_points})'
+
+        # Output array
+        atorbs = np.zeros((num_points, self.num_atorbs))
+
+        # Shell type to number of functions and first index
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Loop over each point
+        for pt in range(num_points):
+            x = pos[0, pt] - self.centrepos[:, 0]
+            y = pos[1, pt] - self.centrepos[:, 1]
+            z = pos[2, pt] - self.centrepos[:, 2]
+            r2 = x * x + y * y + z * z
+            r = np.sqrt(r2)
+
+            n_atorb = 0
+            for centre in range(self.num_centres):
+                xc, yc, zc = x[centre], y[centre], z[centre]
+                rc, r2c = r[centre], r2[centre]
+
+                # Compute radial terms up to max_order_r_on_centre[centre]
+                max_r_order = self.max_order_r_on_centre[centre]
+                r_power = np.ones(max_r_order + 1)
+                if max_r_order >= 1:
+                    r_power[1] = rc
+                    for i in range(2, max_r_order + 1):
+                        r_power[i] = r_power[i - 1] * rc
+
+                # Initialize polynomial basis functions
+                poly = np.zeros(25)
+                poly[0] = 1.0
+                poly[1] = xc
+                poly[2] = yc
+                poly[3] = zc
+
+                shelltype_max = self.max_shell_type_on_centre[centre]
+                if shelltype_max >= 4:  # d or higher
+                    xy = xc * yc
+                    yz = yc * zc
+                    zx = zc * xc
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zc**2 - r2c
+                    poly[8] = xc**2 - yc**2
+
+                    if shelltype_max >= 5:  # f or higher
+                        t1 = 5 * zc**2 - r2c
+                        poly[9] = (2 * zc**2 - 3 * (xc**2 + yc**2)) * zc
+                        poly[10] = t1 * xc
+                        poly[11] = t1 * yc
+                        poly[12] = (xc**2 - yc**2) * zc
+                        poly[13] = xy * zc
+                        poly[14] = (xc**2 - 3 * yc**2) * xc
+                        poly[15] = (3 * xc**2 - yc**2) * yc
+
+                        if shelltype_max >= 6:  # g shells
+                            xx_yy3 = xc**2 - 3 * yc**2
+                            xx3_yy = 3 * xc**2 - yc**2
+                            xx_yy = xc**2 - yc**2
+                            zz5 = 5 * zc**2
+                            zz7 = 7 * zc**2
+                            rr3 = 3 * r2c
+                            zz7_rr = zz7 - r2c
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * zz7_rr3 - (zz5 - r2c) * rr3  # 35zzzz - 30zzrr + 3rrrr
+                            poly[17] = zx * zz7_rr3  # xz(7zz - 3rr)
+                            poly[18] = yz * zz7_rr3  # yz(7zz - 3rr)
+                            poly[19] = xx_yy * zz7_rr  # (xx-yy)(7zz-rr)
+                            poly[20] = xy * zz7_rr  # xy(7zz-rr)
+                            poly[21] = zx * xx_yy3  # xz(xx-3yy)
+                            poly[22] = yz * xx3_yy  # yz(3xx-yy)
+                            poly[23] = xc**2 * xx_yy3 - yc**2 * xx3_yy  # xxxx - 6xxyy + yyyy
+                            poly[24] = xy * xx_yy  # xxxy - xyyy
+
+                # Process each shell on this centre
+                start_shell = self.idx_first_shell_on_centre[centre]
+                end_shell = self.idx_first_shell_on_centre[centre + 1]
+
+                for shell_idx in range(start_shell, end_shell):
+                    stype = self.shelltype[shell_idx]
+                    N = self.order_r_in_shell[shell_idx]
+                    zeta_val = self.zeta[shell_idx]
+
+                    zeta_r = zeta_val * rc
+                    if zeta_r > 746.0:  # cutoff
+                        n_atorb += num_poly_in_shell_type[stype]
+                        continue
+
+                    exp_factor = np.exp(-zeta_r)
+
+                    first_pl = first_poly_in_shell_type[stype]
+                    num_pl = num_poly_in_shell_type[stype]
+                    A = slice(first_pl, first_pl + num_pl)
+
+                    phi = poly[A] * exp_factor
+
+                    # Apply radial power
+                    radial_prefactor = r_power[N] if N <= max_r_order else rc**N
+
+                    for pl in range(num_pl):
+                        atorbs[pt, n_atorb] = radial_prefactor * phi[pl]
+                        n_atorb += 1
+
         return atorbs
 
     def get_norm_weave(self):
@@ -870,14 +990,3 @@ class StoWfn:
 if __name__ == '__main__':
     sto = StoWfn('stowfn.data')
     sto.read_molorbmods('correlation.data')
-    points = np.zeros((3, 4))
-    points[:, 0] = (-0.19450689, -0.94412413, -0.67370571)
-    points[:, :] = points[:, :1]
-    points[0, 1] += 0.00317100
-    points[1, 2] += 0.00317100
-    points[2, 3] += 0.00317100
-    val, grad, lap = sto.eval_molorb_derivs(points)
-    print('grad analytic:', grad[:, 0])
-    print('grad numeric:', (val[1:] - val[0]) / 0.00317100)
-    print('norm:', sto.get_norm())
-    sto.writefile('stowfn.data.out')
