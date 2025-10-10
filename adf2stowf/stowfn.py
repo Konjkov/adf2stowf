@@ -836,148 +836,199 @@ class StoWfn:
         return val, grad, lap
 
     def eval_molorb_derivs_python(self, pos, spin=0):
-        """
-        Evaluate molecular orbitals, gradients, and Laplacians (pure Python version).
+        """Evaluate molecular orbitals, gradients, and Laplacians.
 
         Args:
-            pos (numpy.ndarray): shape (3, num_points) — Cartesian coordinates.
-            spin (int): spin index (0 for alpha, 1 for beta if unrestricted).
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
 
         Returns:
-            val (num_points, num_molorbs),
-            grad (3, num_points, num_molorbs),
-            lap (num_points, num_molorbs)
+            tuple:
+                - val (numpy.ndarray): Orbital values (num_points, num_molorbs).
+                - grad (numpy.ndarray): Orbital gradients (3, num_points, num_molorbs).
+                - lap (numpy.ndarray): Orbital Laplacians (num_points, num_molorbs).
         """
+        # Constants from support_code
+        sto_exp_cutoff = 746.0
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Input validation
         num_points = pos.shape[1]
+        assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
+
+        # Initialize output arrays
         val = np.zeros((num_points, num_molorbs))
         grad = np.zeros((3, num_points, num_molorbs))
         lap = np.zeros((num_points, num_molorbs))
         coeff_norm = self.coeff_norm[spin]
 
-        sto_exp_cutoff = 746.0
-        num_poly_in_shell_type = [0, 1, 4, 3, 5, 7, 9]
-        first_poly_in_shell_type = [0, 0, 0, 1, 4, 9, 16]
+        # Initialize arrays from eval_code
+        poly = np.zeros(25)  # Polynomial terms
+        phi = np.zeros(9)  # Basis functions for a shell
+        dpoly = np.zeros((3, 25))  # Gradients of polynomial terms
+        dphi = np.zeros((3, 9))  # Gradients of basis functions
+        ddphi = np.zeros(9)  # Laplacians of basis functions
+        r = np.zeros(self.max_order_r + 2)  # Radial terms (index -1 to max_order_r)
 
-        # вспомогательная функция для вычисления полиномов и производных
-        def poly_and_derivs(x, y, z, max_shell):
-            poly = np.zeros(25)
-            dpoly = np.zeros((3, 25))
-
-            # s и p
-            poly[0] = 1.0
-            poly[1], poly[2], poly[3] = x, y, z
-            dpoly[:, 0] = [0, 0, 0]
-            dpoly[:, 1] = [1, 0, 0]
-            dpoly[:, 2] = [0, 1, 0]
-            dpoly[:, 3] = [0, 0, 1]
-
-            if max_shell >= 4:
-                xx, yy, zz = x * x, y * y, z * z
-                xy, yz, zx = x * y, y * z, z * x
-
-                poly[4:9] = [xy, yz, zx, 3 * zz - (xx + yy + zz), xx - yy]
-                dpoly[:, 4] = [y, x, 0]
-                dpoly[:, 5] = [0, z, y]
-                dpoly[:, 6] = [z, 0, x]
-                dpoly[:, 7] = [-2 * x, -2 * y, 4 * z]
-                dpoly[:, 8] = [2 * x, -2 * y, 0]
-
-                if max_shell >= 5:
-                    t1 = 5 * zz - (xx + yy + zz)
-                    poly[9:16] = [
-                        (2 * zz - 3 * (xx + yy)) * z,
-                        t1 * x,
-                        t1 * y,
-                        (xx - yy) * z,
-                        xy * z,
-                        (xx - 3 * yy) * x,
-                        (3 * xx - yy) * y,
-                    ]
-
-                    dpoly[:, 9] = [-6 * z * x, -6 * z * y, 6 * zz - 3 * (xx + yy)]
-                    dpoly[:, 10] = [4 * zz - yy - 3 * xx, -2 * xy, 8 * z * x]
-                    dpoly[:, 11] = [-2 * xy, 4 * zz - xx - 3 * yy, 8 * y * z]
-                    dpoly[:, 12] = [2 * z * x, -2 * y * z, xx - yy]
-                    dpoly[:, 13] = [y * z, z * x, x * y]
-                    dpoly[:, 14] = [3 * xx - 3 * yy, -6 * xy, 0]
-                    dpoly[:, 15] = [6 * xy, 3 * xx - 3 * yy, 0]
-
-            return poly, dpoly
-
-        # Основной цикл
+        # Loop over points
         for pt in range(num_points):
             n_shell = 0
             n_atorb = 0
 
+            # Loop over centers
             for centre in range(self.num_centres):
-                cx, cy, cz = self.centrepos[centre]
-                x = pos[0, pt] - cx
-                y = pos[1, pt] - cy
-                z = pos[2, pt] - cz
-                r2 = x * x + y * y + z * z
-                r = np.sqrt(r2) if r2 > 1e-14 else 1e-14
+                # Compute relative coordinates
+                x = pos[0, pt] - self.centrepos[centre, 0]
+                y = pos[1, pt] - self.centrepos[centre, 1]
+                z = pos[2, pt] - self.centrepos[centre, 2]
+                xx = x * x
+                yy = y * y
+                zz = z * z
 
-                poly, dpoly = poly_and_derivs(x, y, z, self.max_shell_type_on_centre[centre])
+                # Compute radial terms
+                r[2] = xx + yy + zz
+                r[1] = np.sqrt(r[2])
+                for i in range(3, self.max_order_r_on_centre[centre] + 1):
+                    r[i] = r[i - 1] * r[1]
+                if self.max_order_r_on_centre[centre] > 0:
+                    r[0] = 1.0
+                    r[-1] = 1.0 / r[1] if r[1] != 0 else 0.0
 
+                # Normalized coordinates
+                xnorm = x * r[-1] if r[1] != 0 else 0.0
+                ynorm = y * r[-1] if r[1] != 0 else 0.0
+                znorm = z * r[-1] if r[1] != 0 else 0.0
+
+                # Compute polynomial terms for s and p shells
+                poly[0] = 1.0  # s
+                poly[1] = x  # px
+                poly[2] = y  # py
+                poly[3] = z  # pz
+
+                # Compute derivatives for s and p shells
+                dpoly[:, 0] = [0.0, 0.0, 0.0]  # s
+                dpoly[:, 1] = [1.0, 0.0, 0.0]  # px
+                dpoly[:, 2] = [0.0, 1.0, 0.0]  # py
+                dpoly[:, 3] = [0.0, 0.0, 1.0]  # pz
+
+                # Compute polynomial terms for d and higher shells
+                if self.max_shell_type_on_centre[centre] >= 4:
+                    xy = x * y
+                    yz = y * z
+                    zx = z * x
+
+                    # d shell polynomials
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zz - r[2]
+                    poly[8] = xx - yy
+
+                    # d shell derivatives
+                    dpoly[:, 4] = [y, x, 0.0]
+                    dpoly[:, 5] = [0.0, z, y]
+                    dpoly[:, 6] = [z, 0.0, x]
+                    dpoly[:, 7] = [-2 * x, -2 * y, 4 * z]
+                    dpoly[:, 8] = [2 * x, -2 * y, 0.0]
+
+                    if self.max_shell_type_on_centre[centre] >= 5:
+                        t1 = 5 * zz - r[2]
+
+                        # f shell polynomials
+                        poly[9] = (2 * zz - 3 * (xx + yy)) * z
+                        poly[10] = t1 * x
+                        poly[11] = t1 * y
+                        poly[12] = (xx - yy) * z
+                        poly[13] = xy * z
+                        poly[14] = (xx - 3.0 * yy) * x
+                        poly[15] = (3.0 * xx - yy) * y
+
+                        # f shell derivatives
+                        dpoly[:, 9] = [-6 * zx, -6 * yz, 6 * zz - 3 * (xx + yy)]
+                        dpoly[:, 10] = [4 * zz - yy - 3 * xx, -2 * xy, 8 * zx]
+                        dpoly[:, 11] = [-2 * xy, 4 * zz - xx - 3 * yy, 8 * yz]
+                        dpoly[:, 12] = [2 * zx, -2 * yz, xx - yy]
+                        dpoly[:, 13] = [yz, zx, xy]
+                        dpoly[:, 14] = [3 * xx - 3 * yy, -6 * xy, 0.0]
+                        dpoly[:, 15] = [6 * xy, 3 * xx - 3 * yy, 0.0]
+
+                        if self.max_shell_type_on_centre[centre] >= 6:
+                            # g shell polynomials
+                            xx_yy3 = xx - 3 * yy
+                            xx3_yy = 3 * xx - yy
+                            xx_yy = xx - yy
+                            zz5 = 5 * zz
+                            zz7 = 7 * zz
+                            rr3 = 3 * r[2]
+                            zz7_rr = zz7 - r[2]
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * (zz7_rr3) - (zz5 - r[2]) * rr3
+                            poly[17] = zx * (zz7_rr3)
+                            poly[18] = yz * (zz7_rr3)
+                            poly[19] = xx_yy * (zz7_rr)
+                            poly[20] = xy * (zz7_rr)
+                            poly[21] = zx * (xx_yy3)
+                            poly[22] = yz * (xx3_yy)
+                            poly[23] = xx * (xx_yy3) - yy * (xx3_yy)
+                            poly[24] = xy * (xx_yy)
+
+                            # g shell derivatives are not implemented
+                            if self.max_shell_type_on_centre[centre] >= 6:
+                                raise NotImplementedError('Gradient and Laplacian of g orbitals not yet implemented')
+
+                # Loop over shells on this center
                 for shell in range(self.num_shells_on_centre[centre]):
-                    zeta = self.zeta[n_shell]
-                    shelltype = self.shelltype[n_shell]
-                    N = self.order_r_in_shell[n_shell]
-                    zeta_r = zeta * r
-
-                    if zeta_r > sto_exp_cutoff:
-                        n_atorb += num_poly_in_shell_type[shelltype]
+                    zeta_rabs = self.zeta[n_shell] * r[1]
+                    if zeta_rabs > sto_exp_cutoff:
+                        n_atorb += num_poly_in_shell_type[self.shelltype[n_shell]]
                         n_shell += 1
                         continue
 
-                    exp_zeta_r = np.exp(-zeta_r)
-                    first = first_poly_in_shell_type[shelltype]
-                    count = num_poly_in_shell_type[shelltype]
-                    phi = poly[first : first + count] * exp_zeta_r
+                    exp_zeta_rabs = np.exp(-zeta_rabs)
+                    start = first_poly_in_shell_type[self.shelltype[n_shell]]
+                    end = start + num_poly_in_shell_type[self.shelltype[n_shell]]
+                    X = slice(0, end - start)
+                    A = slice(start, end)
 
-                    # производные по x,y,z
-                    dphi = dpoly[:, first : first + count] * exp_zeta_r
-                    dphi -= np.array([[zeta * x / r], [zeta * y / r], [zeta * z / r]]) * phi
+                    # Compute basis functions
+                    phi[X] = poly[A] * exp_zeta_rabs
 
-                    # лапласиан (численно приближённо)
-                    ddphi = (
-                        -2
-                        * zeta
-                        / r
-                        * (
-                            x * dpoly[0, first : first + count]
-                            + y * dpoly[1, first : first + count]
-                            + z * dpoly[2, first : first + count]
-                            + poly[first : first + count]
-                        )
-                        + zeta * zeta * poly[first : first + count]
-                    ) * exp_zeta_r
+                    # Compute derivatives
+                    dphi[0, X] = dpoly[0, A] * exp_zeta_rabs - self.zeta[n_shell] * xnorm * phi[X]
+                    dphi[1, X] = dpoly[1, A] * exp_zeta_rabs - self.zeta[n_shell] * ynorm * phi[X]
+                    dphi[2, X] = dpoly[2, A] * exp_zeta_rabs - self.zeta[n_shell] * znorm * phi[X]
+                    ddphi[X] = (
+                        -2 * self.zeta[n_shell] * r[-1] * (x * dpoly[0, A] + y * dpoly[1, A] + z * dpoly[2, A] + poly[A])
+                        + self.zeta[n_shell] ** 2 * poly[A]
+                    ) * exp_zeta_rabs
 
-                    # Радиационная часть (r^N)
-                    rN = r**N
+                    N = self.order_r_in_shell[n_shell]
+
                     if N == 0:
-                        factor = 1.0
-                        dr_factor = 0.0
-                        lap_factor = 0.0
+                        # No radial prefactor
+                        for pl in range(num_poly_in_shell_type[self.shelltype[n_shell]]):
+                            val[pt, :] += coeff_norm[:, n_atorb] * phi[pl]
+                            grad[0, pt, :] += coeff_norm[:, n_atorb] * dphi[0, pl]
+                            grad[1, pt, :] += coeff_norm[:, n_atorb] * dphi[1, pl]
+                            grad[2, pt, :] += coeff_norm[:, n_atorb] * dphi[2, pl]
+                            lap[pt, :] += coeff_norm[:, n_atorb] * ddphi[pl]
+                            n_atorb += 1
                     else:
-                        factor = rN
-                        dr_factor = N * r ** (N - 2)
-                        lap_factor = N * (N + 1) * r ** (N - 2)
-
-                    for pl in range(count):
-                        ao_idx = n_atorb + pl
-                        coeff = coeff_norm[:, ao_idx]
-
-                        val[pt, :] += coeff * (factor * phi[pl])
-                        grad[0, pt, :] += coeff * (dr_factor * x * phi[pl] + factor * dphi[0, pl])
-                        grad[1, pt, :] += coeff * (dr_factor * y * phi[pl] + factor * dphi[1, pl])
-                        grad[2, pt, :] += coeff * (dr_factor * z * phi[pl] + factor * dphi[2, pl])
-                        lap[pt, :] += coeff * (
-                            lap_factor * phi[pl] + 2 * dr_factor * (x * dphi[0, pl] + y * dphi[1, pl] + z * dphi[2, pl]) + factor * ddphi[pl]
-                        )
-
-                    n_atorb += count
+                        # With radial prefactor
+                        for pl in range(num_poly_in_shell_type[self.shelltype[n_shell]]):
+                            val[pt, :] += coeff_norm[:, n_atorb] * r[N] * phi[pl]
+                            grad[0, pt, :] += coeff_norm[:, n_atorb] * (N * x * r[N - 2] * phi[pl] + r[N] * dphi[0, pl])
+                            grad[1, pt, :] += coeff_norm[:, n_atorb] * (N * y * r[N - 2] * phi[pl] + r[N] * dphi[1, pl])
+                            grad[2, pt, :] += coeff_norm[:, n_atorb] * (N * z * r[N - 2] * phi[pl] + r[N] * dphi[2, pl])
+                            lap[pt, :] += coeff_norm[:, n_atorb] * (
+                                N * (N + 1) * r[N - 2] * phi[pl]
+                                + 2 * N * r[N - 2] * (x * dphi[0, pl] + y * dphi[1, pl] + z * dphi[2, pl])
+                                + r[N] * ddphi[pl]
+                            )
+                            n_atorb += 1
                     n_shell += 1
 
         return val, grad, lap
