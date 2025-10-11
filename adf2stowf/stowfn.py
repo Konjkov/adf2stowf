@@ -893,25 +893,25 @@ class StoWfn:
                 for i in range(3, self.max_order_r_on_centre[centre] + 1):
                     r[i] = r[i - 1] * r[1]
                 if self.max_order_r_on_centre[centre] > 0:
-                    r[0] = 1.0
-                    r[-1] = 1.0 / r[1] if r[1] != 0 else 0.0
+                    r[0] = 1
+                    r[-1] = 1 / r[1] if r[1] != 0 else 0
 
                 # Normalized coordinates
-                xnorm = x * r[-1] if r[1] != 0 else 0.0
-                ynorm = y * r[-1] if r[1] != 0 else 0.0
-                znorm = z * r[-1] if r[1] != 0 else 0.0
+                xnorm = x * r[-1] if r[1] != 0 else 0
+                ynorm = y * r[-1] if r[1] != 0 else 0
+                znorm = z * r[-1] if r[1] != 0 else 0
 
                 # Compute polynomial terms for s and p shells
-                poly[0] = 1.0  # s
+                poly[0] = 1  # s
                 poly[1] = x  # px
                 poly[2] = y  # py
                 poly[3] = z  # pz
 
                 # Compute derivatives for s and p shells
-                dpoly[:, 0] = [0.0, 0.0, 0.0]  # s
-                dpoly[:, 1] = [1.0, 0.0, 0.0]  # px
-                dpoly[:, 2] = [0.0, 1.0, 0.0]  # py
-                dpoly[:, 3] = [0.0, 0.0, 1.0]  # pz
+                dpoly[:, 0] = [0, 0, 0]  # s
+                dpoly[:, 1] = [1, 0, 0]  # px
+                dpoly[:, 2] = [0, 1, 0]  # py
+                dpoly[:, 3] = [0, 0, 1]  # pz
 
                 # Compute polynomial terms for d and higher shells
                 if self.max_shell_type_on_centre[centre] >= 4:
@@ -927,23 +927,21 @@ class StoWfn:
                     poly[8] = xx - yy
 
                     # d shell derivatives
-                    dpoly[:, 4] = [y, x, 0.0]
-                    dpoly[:, 5] = [0.0, z, y]
-                    dpoly[:, 6] = [z, 0.0, x]
+                    dpoly[:, 4] = [y, x, 0]
+                    dpoly[:, 5] = [0, z, y]
+                    dpoly[:, 6] = [z, 0, x]
                     dpoly[:, 7] = [-2 * x, -2 * y, 4 * z]
-                    dpoly[:, 8] = [2 * x, -2 * y, 0.0]
+                    dpoly[:, 8] = [2 * x, -2 * y, 0]
 
                     if self.max_shell_type_on_centre[centre] >= 5:
-                        t1 = 5 * zz - r[2]
-
                         # f shell polynomials
                         poly[9] = (2 * zz - 3 * (xx + yy)) * z
-                        poly[10] = t1 * x
-                        poly[11] = t1 * y
+                        poly[10] = (5 * zz - r[2]) * x
+                        poly[11] = (5 * zz - r[2]) * y
                         poly[12] = (xx - yy) * z
                         poly[13] = xy * z
-                        poly[14] = (xx - 3.0 * yy) * x
-                        poly[15] = (3.0 * xx - yy) * y
+                        poly[14] = (xx - 3 * yy) * x
+                        poly[15] = (3 * xx - yy) * y
 
                         # f shell derivatives
                         dpoly[:, 9] = [-6 * zx, -6 * yz, 6 * zz - 3 * (xx + yy)]
@@ -951,8 +949,8 @@ class StoWfn:
                         dpoly[:, 11] = [-2 * xy, 4 * zz - xx - 3 * yy, 8 * yz]
                         dpoly[:, 12] = [2 * zx, -2 * yz, xx - yy]
                         dpoly[:, 13] = [yz, zx, xy]
-                        dpoly[:, 14] = [3 * xx - 3 * yy, -6 * xy, 0.0]
-                        dpoly[:, 15] = [6 * xy, 3 * xx - 3 * yy, 0.0]
+                        dpoly[:, 14] = [3 * xx - 3 * yy, -6 * xy, 0]
+                        dpoly[:, 15] = [6 * xy, 3 * xx - 3 * yy, 0]
 
                         if self.max_shell_type_on_centre[centre] >= 6:
                             # g shell polynomials
