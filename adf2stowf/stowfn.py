@@ -811,7 +811,7 @@ class StoWfn:
 
         return val
 
-    def eval_molorb_derivs(self, pos, spin=0):
+    def eval_molorb_derivs_weave(self, pos, spin=0):
         """Evaluate molecular orbitals, gradients, and Laplacians.
 
         Args:
@@ -835,7 +835,7 @@ class StoWfn:
         weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS', 'CALC_DERIVS'])
         return val, grad, lap
 
-    def eval_molorb_derivs_python(self, pos, spin=0):
+    def eval_molorb_derivs(self, pos, spin=0):
         """Evaluate molecular orbitals, gradients, and Laplacians.
 
         Args:
@@ -848,8 +848,9 @@ class StoWfn:
                 - grad (numpy.ndarray): Orbital gradients (3, num_points, num_molorbs).
                 - lap (numpy.ndarray): Orbital Laplacians (num_points, num_molorbs).
         """
-        # Constants from support_code
+        # Cutoff for exp(-zeta*r) to avoid underflow
         sto_exp_cutoff = 746.0
+        # Shell type to number of functions and first polynomial index
         num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
         first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
 
@@ -858,7 +859,7 @@ class StoWfn:
         assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
 
-        # Initialize output arrays
+        # Output: MO values, gradient, laplacian at each point
         val = np.zeros((num_points, num_molorbs))
         grad = np.zeros((3, num_points, num_molorbs))
         lap = np.zeros((num_points, num_molorbs))
