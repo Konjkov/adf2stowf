@@ -16,8 +16,6 @@ The script has been verified to work with:
     Python 3.9.23
     NumPy 1.24.4
     SciPy 1.13.1
-    scipy-weave 0.19.0
-    pybind >=3.0.0
 
 For optional plotting of the cusp constraints
 
