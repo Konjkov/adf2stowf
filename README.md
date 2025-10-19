@@ -7,10 +7,6 @@ program.
 
 For general information about the ADF program, see http://www.scm.com/
 
-For help and further information about this script, please contact the authors:
-    Konkov Vladimir <Konjkov.VV@gmail.com>
-    Norbert Nemec <Norbert@Nemec-online.de>
-
 
 Requirements
 ============
@@ -27,6 +23,16 @@ For optional plotting of the cusp constraints
 
     Matplotlib >=3.9.0
 
+To build the package from source, you must first install the required system dependencies. On Ubuntu/Debian-based systems, run:
+
+```bash
+sudo apt update
+sudo apt install python3-dev python3-distutils python3-venv build-essential cmake
+cd source-dir
+pip install .
+```
+
+or just `pip install adf2stowf`
 
 Usage
 =====

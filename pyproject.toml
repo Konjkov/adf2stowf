@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'adf2stowf'
-version = '0.9.2'
+version = '1.0.0'
 description = 'Converter from ADF TAPE21.asc to CASINO stowfn.data'
 authors = [
     {name = "Vladimir Konkov", email = "Konjkov.VV@gmail.com"},
@@ -19,17 +19,17 @@ classifiers = [
     'Intended Audience :: Science/Research',
     'Operating System :: POSIX :: Linux',
     'Topic :: Scientific/Engineering :: Chemistry',
-    'Programming Language :: Python :: 3.9',
+    'Programming Language :: C++',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
 ]
-requires-python = ">=3.9,<3.10"
+requires-python = ">=3.10,<3.12"
 dependencies = [
-    'numpy==1.24.4',
-    'scipy==1.13.1',
-    'scipy-weave==0.19.0',
+    'numpy>=1.24.4',
     'matplotlib>=3.9.0',
 ]
 [project.urls]
-repository = 'https://github.com/Konjkov/adf2stowf/tree/original'
+repository = 'https://github.com/Konjkov/adf2stowf'
 
 [tool.setuptools]
 packages = ['adf2stowf']
