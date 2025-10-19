@@ -21,9 +21,6 @@ class AdfParser:
         self.lines: List[str] = []
         self.data: Dict[str, Dict[str, Any]] = {}
 
-    # -----------------------
-    # Utility functions
-    # -----------------------
     @staticmethod
     def _float_x(x: str) -> float:
         """Convert ADF float string to Python float."""
@@ -42,9 +39,6 @@ class AdfParser:
         """Convert ADF int string to Python int, handling overflow marker."""
         return -(2**31) if s == '**********' else int(s)
 
-    # -----------------------
-    # Parsing primitives
-    # -----------------------
     def _parse_integers(self, start: int, count: int) -> (np.ndarray, int):
         values: List[int] = []
         i = start
@@ -92,9 +86,6 @@ class AdfParser:
         else:
             raise ValueError(f'Unexpected type {typ}, expected 1..4')
 
-    # -----------------------
-    # High-level parsing
-    # -----------------------
     def load(self) -> None:
         """Read file contents into memory."""
         try:
@@ -138,9 +129,6 @@ class AdfParser:
 
         return self.data
 
-    # -----------------------
-    # Output
-    # -----------------------
     def write_dump(self, outfile: Union[str, Path]) -> None:
         """Write human-readable dump of parsed data."""
         if not self.data:
