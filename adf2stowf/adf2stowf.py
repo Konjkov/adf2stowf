@@ -497,19 +497,31 @@ class ADFToStoWF:
 
         if self.PLOT_CUSPS:
             # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
-            self.z = np.linspace(-0.5, 0.5, 501)
-            r = [np.zeros((3, len(self.z))) + self.sto.atompos[at, :][:, None] for at in range(self.sto.num_atom)]
-            for ir in r:
-                ir[2, :] += self.z
-            self.val_pre = [[self.sto.eval_molorbs(ir, spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for ir in r]
-            self.lap_pre = [[self.sto.eval_molorb_derivs(ir, spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)] for ir in r]
+            self.z = np.linspace(-0.5, 0.5, 500)
+            # Create offset array of shape (3, self.z.size)
+            offset = np.zeros((3, self.z.size))
+            offset[2, :] = self.z
+            # Create r with shape (self.sto.num_atom, 3, self.z.size)
+            r = self.sto.atompos[:, :, None] + offset[None, :, :]
+            self.val_pre = [
+                [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
+            ]
+            self.lap_pre = [
+                [self.sto.eval_molorb_derivs(r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
+                for atom in range(self.sto.num_atom)
+            ]
 
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
         if self.PLOT_CUSPS:
-            self.val_post = [[self.sto.eval_molorbs(ir, spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for ir in r]
-            self.lap_post = [[self.sto.eval_molorb_derivs(ir, spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)] for ir in r]
+            self.val_post = [
+                [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
+            ]
+            self.lap_post = [
+                [self.sto.eval_molorb_derivs(r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
+                for atom in range(self.sto.num_atom)
+            ]
 
         if self.CUSP_METHOD != 'none':
             print('Molorb values at nuclei after applying cusp constraint:')
@@ -538,15 +550,18 @@ class ADFToStoWF:
             for sp in range(self.Nspins):
                 for i in range(np.sum(self.fixed[sp])):
                     vpre = self.val_pre[at][sp][:, i]  # wavefunction before correction
+                    if np.allclose(vpre, 0):
+                        print(f'val_pre at spin {sp}, orb {i}: is allclose to 0')
+                        continue
                     vpost = self.val_post[at][sp][:, i]  # wavefunction after correction
                     sgn = np.sign(vpre[len(vpre) // 2])  # sign normalization
                     # Plot wavefunction before and after correction
                     (pl,) = axval[at].plot(self.z, sgn * vpre, '--')
                     axval[at].plot(self.z, sgn * vpost, '-', color=pl.get_color())
                     # Compute local energy before and after correction:
-                    # E_loc = -0.5 * (Laplacian / wavefunction) - Z / |r|
-                    eloc_pre = -0.5 * self.lap_pre[at][sp][:, i] / self.val_pre[at][sp][:, i] - self.sto.atomnum[at] / np.abs(self.z)
-                    eloc_post = -0.5 * self.lap_post[at][sp][:, i] / self.val_post[at][sp][:, i] - self.sto.atomnum[at] / np.abs(self.z)
+                    # E_loc = - (Laplacian / wavefunction) / 2 - Z / |r|
+                    eloc_pre = -self.lap_pre[at][sp][:, i] / vpre / 2 - self.sto.atomnum[at] / np.abs(self.z)
+                    eloc_post = -self.lap_post[at][sp][:, i] / vpost / 2 - self.sto.atomnum[at] / np.abs(self.z)
                     # Plot local energy before and after correction
                     axeloc[at].plot(self.z, eloc_pre, '--', color=pl.get_color())
                     axeloc[at].plot(self.z, eloc_post, '-', color=pl.get_color())
