@@ -1,12 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.9
 
 # (C) 2008 Norbert Nemec
 # This file is part of the CASINO distribution.
 # Permission is given to use the script along with the CASINO program and modify
 # it for personal use.
 
+import inspect
+import sys
+from math import factorial, sqrt
+
 import numpy as np
-import stowfn_cpp
+from scipy.linalg import null_space
 
 F2P_bool = {'.false.': False, '.true.': True}
 P2F_bool = {False: '.false.', True: '.true.'}
@@ -14,7 +18,346 @@ P2F_bool = {False: '.false.', True: '.true.'}
 num_orbs_per_shelltype = np.array([0, 1, 4, 3, 5, 7, 9])
 
 
-class stowfn:
+def mapunion(a, b):
+    res = a.copy()
+    res.update(b)
+    return res
+
+
+def lineno():
+    """Returns the current line number in our program."""
+    return inspect.currentframe().f_back.f_lineno
+
+
+def weave_inline(support_code, code, dict, defs=[]):
+    try:
+        import weave
+    except ImportError:
+        print('This program requires the weave library, which could not be')
+        print('found.')
+        sys.exit()
+    weave.inline(
+        headers=['<cstdlib>', '<cmath>'],
+        support_code='\n'.join(['#define ' + d for d in defs] + [support_code]),
+        code='\n'.join(['// #define ' + d for d in defs] + [code]),
+        arg_names=dict.keys(),
+        local_dict=dict,
+        type_converters=weave.converters.blitz,
+        compiler='gcc',
+        extra_compile_args=['-Wno-all'],
+        verbose=1,
+    )
+
+
+support_code = (
+    r"""
+#line """
+    + '%i' % (lineno() + 1)
+    + r""" "stowfn.py"
+const double sto_exp_cutoff = 746.0;
+const int num_poly_in_shell_type[] = { 0, 1, 4, 3, 5, 7, 9 };
+const int first_poly_in_shell_type[] = { 0, 0, 0, 1, 4, 9, 16 };
+const double pi = 3.14159265358979323846;
+
+const int polypow[25] = {
+    0,
+    1,1,1,
+    2,2,2,2,2,
+    3,3,3,3,3,3,3,
+    4,4,4,4,4,4,4,4,4
+};
+
+double factorial(int N) {
+    if(N<=1) return 1.0;
+    else     return N*factorial(N-1);
+}
+
+template <typename T>
+inline blitz::Array<T,1> vec(const T a1,const T a2,const T a3)
+{blitz::Array<T,1> res(3); res=a1,a2,a3; return res; }
+"""
+)
+
+eval_code = (
+    r"""
+#line """
+    + '%i' % (lineno() + 1)
+    + r""" "stowfn.py"
+blitz::Range all = blitz::Range::all();
+
+blitz::Array<double,1> poly(25), phi(9);
+#ifdef CALC_DERIVS
+blitz::Array<double,2> dpoly(3,25), dphi(3,9);
+blitz::Array<double,1> ddphi(9);
+#endif
+
+#ifdef EVAL_MOLORBS
+blitz::Range M(0,num_molorbs);
+
+val = 0.0;
+#ifdef CALC_DERIVS
+grad = 0.0;
+lap = 0.0;
+#endif
+#endif
+
+blitz::Array<double,1> r(blitz::Range(-1,max_order_r));
+
+for(int pt=0;pt<num_points;pt++) {
+  int n_shell=0;
+  int n_atorb=0;
+
+  for(int centre=0;centre<num_centres;centre++) {
+    double x=pos(0,pt)-centrepos(centre,0);
+    double y=pos(1,pt)-centrepos(centre,1);
+    double z=pos(2,pt)-centrepos(centre,2);
+    double xx=x*x;
+    double yy=y*y;
+    double zz=z*z;
+
+    r(2)=xx+yy+zz;
+    r(1)=sqrt(r(2));
+    for(int i=3;i<=max_order_r_on_centre(centre);i++)
+      r(i)=r(i-1)*r(1);
+
+    if(max_order_r_on_centre(centre)>0) {
+      r(0)=1.0;
+      r(-1)=1.0/r(1);
+    }
+
+    double xnorm=x*r(-1);
+    double ynorm=y*r(-1);
+    double znorm=z*r(-1);
+
+    poly(0) = 1;
+    poly(1) = x;
+    poly(2) = y;
+    poly(3) = z;
+
+#ifdef CALC_DERIVS
+    dpoly(all,0) = vec(0.,0.,0.);
+    dpoly(all,1) = vec(1.,0.,0.);
+    dpoly(all,2) = vec(0.,1.,0.);
+    dpoly(all,3) = vec(0.,0.,1.);
+#endif
+
+    if(max_shell_type_on_centre(centre)>=4) {
+      // there are d and/or higher shells
+      double xy = x*y;
+      double yz = y*z;
+      double zx = z*x;
+
+      // polynomials for d shells
+      poly(4)=xy;
+      poly(5)=yz;
+      poly(6)=zx;
+      poly(7)=3*zz-r(2);
+      poly(8)=xx-yy;
+
+#ifdef CALC_DERIVS
+      dpoly(all,4) = vec(   y,   x,  0.);
+      dpoly(all,5) = vec(   0.,   z,  y);
+      dpoly(all,6) = vec(   z,   0.,  x);
+      dpoly(all,7) = vec(-2*x,-2*y,4*z);
+      dpoly(all,8) = vec( 2*x,-2*y,  0.);
+#endif
+
+      if(max_shell_type_on_centre(centre) >= 5) {
+        // there are f and/or higher shells
+        double t1 = 5*zz-r(2);
+
+        poly( 9)=(2*zz-3*(xx+yy))*z;  // (2*zz-3*(xx+yy))*z
+        poly(10)=t1*x;                // (4*zz-(xx+yy))*x
+        poly(11)=t1*y;                // (4*zz-(xx+yy))*y
+        poly(12)=(xx-yy)*z;
+        poly(13)=xy*z;
+        poly(14)=(xx-3.0*yy)*x;
+        poly(15)=(3.0*xx-yy)*y;
+
+#ifdef CALC_DERIVS
+        dpoly(all, 9) = vec(-6*zx,-6*yz,6*zz-3*(xx+yy));
+        dpoly(all,10) = vec( 4*zz-yy-3*xx,-2*xy,8*zx);
+        dpoly(all,11) = vec(-2*xy,4*zz-xx-3*yy,8*yz);
+        dpoly(all,12) = vec( 2*zx,-2*yz,xx-yy);
+        dpoly(all,13) = vec( yz,zx,xy);
+        dpoly(all,14) = vec( 3*xx-3*yy,-6*xy,0.);
+        dpoly(all,15) = vec( 6*xy,3*xx-3*yy,0.);
+#endif
+
+        if(max_shell_type_on_centre(centre) >= 6) {
+          // there are g shells
+
+          double xx_yy3=xx-3*yy;
+          double xx3_yy=3*xx-yy;
+          double xx_yy=xx-yy;
+          double zz5=5*zz;
+          double zz7=7*zz;
+          double rr3=3*r(2);
+          double zz7_rr=zz7-r(2);
+          double zz7_rr3=zz7-rr3;
+
+          poly(16)=zz5*(zz7_rr3) - (zz5 - r(2))*rr3; // 35zzzz-30zzrr+3rrrr
+          poly(17)=zx*(zz7_rr3);                     // xz(7zz-3rr)
+          poly(18)=yz*(zz7_rr3);                     // yz(7zz-3rr)
+          poly(19)=(xx_yy)*(zz7_rr);                 // (xx-yy)(7zz-rr)
+          poly(20)=xy*(zz7_rr);                      // xy(7zz-rr)
+          poly(21)=zx*(xx_yy3);                      // xz(xx-3yy)
+          poly(22)=yz*(xx3_yy);                      // yz(3xx-yy)
+          poly(23)=xx*(xx_yy3) - yy*(xx3_yy);        // xxxx-6xxyy+yyyy
+          poly(24)=xy*(xx_yy);                       // xxxy-xyyy
+
+
+#ifdef CALC_DERIVS
+//          dpoly(all, 16) = -60zzx+12rrx,   -60zzy+12rry,   140zzz-60zrr-60zzz+12rrz
+//          dpoly(all, 17) = 7zzz-3zrr-6zxx, -6xyz,          21xzz-3xrr-6xzz
+//          dpoly(all, 18) = -6xyz,          7zzz-3zrr-6zyy, 21yzz-3yrr-6yzz
+//          dpoly(all, 19) = 14xzz-2xrr-2xxx+2xyy, ...
+//          dpoly(all, 20) =
+//          dpoly(all, 21) =
+//          dpoly(all, 22) =
+//          dpoly(all, 23) =
+//          dpoly(all, 24) =
+
+          throw "gradient and laplacian of g orbitals not yet implemented";
+#endif
+        }
+      }
+    }
+
+//std::cout << "poly = "<< poly << "\n";
+//#ifdef CALC_DERIVS
+//std::cout << "dpoly = "<< dpoly << "\n";
+//#endif
+
+    for(int shell=0; shell<num_shells_on_centre(centre);shell++,n_shell++) {
+      double zeta_rabs=zeta(n_shell)*r(1);
+      if(zeta_rabs>sto_exp_cutoff) {
+        n_atorb += num_poly_in_shell_type[shelltype(n_shell)];
+        continue; // to next shell
+      }
+      double exp_zeta_rabs=exp(-zeta_rabs);
+      blitz::Range A(first_poly_in_shell_type[shelltype(n_shell)],first_poly_in_shell_type[shelltype(n_shell)]+num_poly_in_shell_type[shelltype(n_shell)]-1);
+      blitz::Range X(0,num_poly_in_shell_type[shelltype(n_shell)]-1);
+      phi(X) = poly(A)*exp_zeta_rabs;
+#ifdef CALC_DERIVS
+      dphi(0,X) = dpoly(0,A)*exp_zeta_rabs-zeta(n_shell)*xnorm*phi(X);
+      dphi(1,X) = dpoly(1,A)*exp_zeta_rabs-zeta(n_shell)*ynorm*phi(X);
+      dphi(2,X) = dpoly(2,A)*exp_zeta_rabs-zeta(n_shell)*znorm*phi(X);
+      ddphi(X) = (
+          -2*zeta(n_shell)*r(-1)*(x*dpoly(0,A)+y*dpoly(1,A)+z*dpoly(2,A)+poly(A))
+          +zeta(n_shell)*zeta(n_shell)*poly(A)
+        )*exp_zeta_rabs;
+#endif
+
+      int N=order_r_in_shell(n_shell);
+
+      if(N==0) {
+
+#ifdef EVAL_ATORBS
+        for(int pl=0;pl<num_poly_in_shell_type[shelltype(n_shell)];pl++) {
+          atorbs(pt,n_atorb)=phi(pl);
+          n_atorb++;
+        }
+#endif // EVAL_ATORBS
+
+#ifdef EVAL_MOLORBS
+        for(int pl=0;pl<num_poly_in_shell_type[shelltype(n_shell)];pl++) {
+          val(pt,all)+=coeff_norm(all,n_atorb)*phi(pl);
+#ifdef CALC_DERIVS
+          grad(0,pt,all)+=coeff_norm(all,n_atorb)*dphi(0,pl);
+          grad(1,pt,all)+=coeff_norm(all,n_atorb)*dphi(1,pl);
+          grad(2,pt,all)+=coeff_norm(all,n_atorb)*dphi(2,pl);
+          lap(pt,all)+=coeff_norm(all,n_atorb)*ddphi(pl);
+#endif
+          n_atorb++;
+        }
+#endif // EVAL_MOLORBS
+
+      } else {
+
+#ifdef EVAL_ATORBS
+        for(int pl=0;pl<num_poly_in_shell_type[shelltype(n_shell)];pl++) {
+          atorbs(pt,n_atorb)=r(N)*phi(pl);
+          n_atorb++;
+        }
+#endif // EVAL_ATORBS
+
+#ifdef EVAL_MOLORBS
+        for(int pl=0;pl<num_poly_in_shell_type[shelltype(n_shell)];pl++) {
+          val(pt,all)+=coeff_norm(all,n_atorb)*r(N)*phi(pl);
+#ifdef CALC_DERIVS
+          grad(0,pt,all)+=coeff_norm(all,n_atorb)*(N*x*r(N-2)*phi(pl)+r(N)*dphi(0,pl));
+          grad(1,pt,all)+=coeff_norm(all,n_atorb)*(N*y*r(N-2)*phi(pl)+r(N)*dphi(1,pl));
+          grad(2,pt,all)+=coeff_norm(all,n_atorb)*(N*z*r(N-2)*phi(pl)+r(N)*dphi(2,pl));
+          lap(pt,all)+=coeff_norm(all,n_atorb)*
+            (N*(N+1)*r(N-2)*phi(pl)+2*N*r(N-2)*(x*dphi(0,pl)+y*dphi(1,pl)+z*dphi(2,pl))+r(N)*ddphi(pl));
+#endif
+          n_atorb++;
+        }
+#endif // EVAL_MOLORBS
+
+      }
+
+    } // shell
+  } // centre
+} // pos
+"""
+)
+
+
+norm_code = (
+    r"""
+#line """
+    + '%i' % (lineno() + 1)
+    + r""" "stowfn.py"
+int n_shell=0;
+int n_atorb=0;
+double polynorm[25];
+
+polynorm[0] = sqrt(1./(4.*pi)); // 1
+polynorm[1] = sqrt(3./(4.*pi)); // x
+polynorm[2] = sqrt(3./(4.*pi)); // y
+polynorm[3] = sqrt(3./(4.*pi)); // z
+
+polynorm[4] = .5*sqrt(15./pi); // xy
+polynorm[5] = .5*sqrt(15./pi); // yz
+polynorm[6] = .5*sqrt(15./pi); // zx
+polynorm[7] = .25*sqrt(5./pi); // 3*zz-r(2);
+polynorm[8] = .25*sqrt(15./pi); // xx-yy;
+
+polynorm[ 9] = .25*sqrt(7./pi); // (2*zz-3*(xx+yy))*z;
+polynorm[10] = .25*sqrt(10.5/pi); // (4*zz-(xx+yy))*x;
+polynorm[11] = .25*sqrt(10.5/pi); // (4*zz-(xx+yy))*y;
+polynorm[12] = .25*sqrt(105./pi); // (xx-yy)*z;
+polynorm[13] = .5*sqrt(105./pi); // xy*z;
+polynorm[14] = .25*sqrt(17.5/pi); // (xx-3.0*yy)*x;
+polynorm[15] = .25*sqrt(17.5/pi); // (3.0*xx-yy)*y;
+
+polynorm[16] = .1875*sqrt(1./pi); // 35zzzz-30zzrr+3rrrr
+polynorm[17] = .75*sqrt(2.5/pi); // xz(7zz-3rr)
+polynorm[18] = .75*sqrt(2.5/pi); // yz(7zz-3rr)
+polynorm[19] = .375*sqrt(5./pi); // (xx-yy)(7zz-rr)
+polynorm[20] = .75*sqrt(5./pi); // xy(7zz-rr)
+polynorm[21] = .75*sqrt(17.5/pi); // xz(xx-3yy)
+polynorm[22] = .75*sqrt(17.5/pi); // yz(3xx-yy)
+polynorm[23] = .1875*sqrt(35./pi); // xxxx-6xxyy+yyyy
+polynorm[24] = .75*sqrt(35./pi); // xxxy-xyyy
+
+for(int centre=0; centre<num_centres;centre++) {
+    for(int shell=0; shell<num_shells_on_centre(centre); shell++,n_shell++) {
+        for(int pl=first_poly_in_shell_type[shelltype(n_shell)];
+            pl < first_poly_in_shell_type[shelltype(n_shell)]+num_poly_in_shell_type[shelltype(n_shell)];
+            pl++, n_atorb++) {
+            int n = polypow[pl] + order_r_in_shell(n_shell) + 1;
+            norm(n_atorb)=polynorm[pl] * pow(2*zeta(n_shell),n) * sqrt(2*zeta(n_shell)/factorial(2*n));
+        } // pl
+    } // shell
+} // centre
+"""
+)
+
+
+class StoWfn:
     def __init__(self, fname=None):
         if fname is not None:
             self.readfile(fname)
@@ -284,24 +627,12 @@ class stowfn:
         writeline('----------------------------')
         writeline('GS')
         writeline()
-
-        if hasattr(self, 'coeff_norm'):
-            writeline('ORBITAL COEFFICIENTS (normalized AO)')
-            writeline('------------------------------------')
-            coeff = self.coeff_norm[0][:, :] / self.get_norm()[None, :]
-            writefloats(coeff.reshape((self.num_molorbs[0] * self.num_atorbs)))
-            if self.spin_unrestricted:
-                coeff = self.coeff_norm[1][:, :] / self.get_norm()[None, :]
-                writefloats(coeff.reshape((self.num_molorbs[1] * self.num_atorbs)))
-            writeline()
-        elif hasattr(self, 'coeff'):
-            writeline('ORBITAL COEFFICIENTS (normalized AO)')
-            writeline('------------------------------------')
-            writefloats(self.coeff[0].reshape((self.num_molorbs[0] * self.num_atorbs)))
-            if self.spin_unrestricted:
-                writefloats(self.coeff[1].reshape((self.num_molorbs[1] * self.num_atorbs)))
-            writeline()
-
+        writeline('ORBITAL COEFFICIENTS (normalized AO)')
+        writeline('------------------------------------')
+        writefloats(self.coeff[0].reshape((self.num_molorbs[0] * self.num_atorbs)))
+        if self.spin_unrestricted:
+            writefloats(self.coeff[1].reshape((self.num_molorbs[1] * self.num_atorbs)))
+        writeline()
         f.writelines(self.footer)
         f.close()
 
@@ -321,7 +652,7 @@ class stowfn:
             else:
                 raise "unknown block starting with '" + l[start] + "'"
 
-    def eval_molorbs(self, pos, spin=0):
+    def eval_molorbs_weave(self, pos, spin=0):
         """Evaluate molecular orbitals at given positions.
 
         Args:
@@ -335,22 +666,152 @@ class stowfn:
         assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
         val = np.zeros((num_points, num_molorbs))
+        coeff_norm = self.coeff_norm[spin]
+        dict = mapunion(self.__dict__, locals())
+        weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS'])
+        return val
 
-        stowfn_cpp.eval_molorbs(
-            pos.astype(float),  # (3, num_points)
-            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
-            self.centrepos.astype(float),  # (num_centres, 3)
-            np.asarray(self.coeff_norm[spin], dtype=float),  # (num_molorbs, num_atorbs)
-            val,  # output (num_points, num_molorbs)
-        )
+    def eval_molorbs(self, pos, spin=0):
+        """Evaluate molecular orbitals at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
+
+        Returns:
+            numpy.ndarray: Values of molecular orbitals (num_points, num_molorbs).
+        """
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points), 'pos must be of shape (3, num_points)'
+
+        num_molorbs = self.num_molorbs[spin]
+        coeff_norm = self.coeff_norm[spin]  # Shape: (num_molorbs, num_atorbs)
+
+        # Output: MO values at each point
+        val = np.zeros((num_points, num_molorbs))
+
+        # Shell type to number of functions and first polynomial index
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Cutoff for exp(-zeta*r) to avoid underflow
+        sto_exp_cutoff = 746.0
+
+        # Loop over each evaluation point
+        for pt in range(num_points):
+            x_pt, y_pt, z_pt = pos[:, pt]
+
+            ao_vals = np.zeros(self.num_atorbs)  # AO values at this point
+            iao = 0  # atomic orbital counter
+
+            # Loop over centres
+            for centre in range(self.num_centres):
+                # Vector from centre to point
+                dx = x_pt - self.centrepos[centre, 0]
+                dy = y_pt - self.centrepos[centre, 1]
+                dz = z_pt - self.centrepos[centre, 2]
+                r = np.sqrt(dx * dx + dy * dy + dz * dz)
+
+                # Compute radial powers up to max needed order
+                max_order = self.max_order_r_on_centre[centre]
+                r_powers = np.ones(max_order + 1)
+                for n in range(1, max_order + 1):
+                    r_powers[n] = r_powers[n - 1] * r
+
+                # Angular polynomials (up to g-type)
+                poly = np.zeros(25)
+                poly[0] = 1.0
+                poly[1] = dx
+                poly[2] = dy
+                poly[3] = dz
+
+                shelltype_max = self.max_shell_type_on_centre[centre]
+
+                if shelltype_max >= 4:  # d or higher
+                    xy = dx * dy
+                    yz = dy * dz
+                    zx = dz * dx
+                    xx = dx * dx
+                    yy = dy * dy
+                    zz = dz * dz
+                    rr = r * r
+
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zz - rr
+                    poly[8] = xx - yy
+
+                    if shelltype_max >= 5:  # f or higher
+                        t1 = 5 * zz - rr
+                        poly[9] = (2 * zz - 3 * (xx + yy)) * dz
+                        poly[10] = t1 * dx
+                        poly[11] = t1 * dy
+                        poly[12] = (xx - yy) * dz
+                        poly[13] = xy * dz
+                        poly[14] = (xx - 3 * yy) * dx
+                        poly[15] = (3 * xx - yy) * dy
+
+                        if shelltype_max >= 6:  # g shells
+                            xx_yy3 = xx - 3 * yy
+                            xx3_yy = 3 * xx - yy
+                            xx_yy = xx - yy
+                            zz5 = 5 * zz
+                            zz7 = 7 * zz
+                            rr3 = 3 * rr
+                            zz7_rr = zz7 - rr
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * zz7_rr3 - (zz5 - rr) * rr3  # 35zzzz - 30zzrr + 3rrrr
+                            poly[17] = zx * zz7_rr3  # xz(7zz - 3rr)
+                            poly[18] = yz * zz7_rr3  # yz(7zz - 3rr)
+                            poly[19] = xx_yy * zz7_rr  # (xx-yy)(7zz-rr)
+                            poly[20] = xy * zz7_rr  # xy(7zz-rr)
+                            poly[21] = zx * xx_yy3  # xz(xx-3yy)
+                            poly[22] = yz * xx3_yy  # yz(3xx-yy)
+                            poly[23] = xx * xx_yy3 - yy * xx3_yy  # xxxx - 6xxyy + yyyy
+                            poly[24] = xy * xx_yy  # xxxy - xyyy
+
+                # Process each shell on this centre
+                start_shell = self.idx_first_shell_on_centre[centre]
+                end_shell = self.idx_first_shell_on_centre[centre + 1]
+
+                for ishell in range(start_shell, end_shell):
+                    stype = self.shelltype[ishell]
+                    N_radial = self.order_r_in_shell[ishell]
+                    zeta_val = self.zeta[ishell]
+
+                    zeta_r = zeta_val * r
+                    if zeta_r > sto_exp_cutoff:
+                        # Skip this shell — negligible contribution
+                        iao += num_poly_in_shell_type[stype]
+                        continue
+
+                    exp_factor = np.exp(-zeta_r)
+
+                    first_pl = first_poly_in_shell_type[stype]
+                    num_pl = num_poly_in_shell_type[stype]
+                    A = slice(first_pl, first_pl + num_pl)
+
+                    phi = poly[A] * exp_factor
+
+                    # Apply radial factor: r^N
+                    if N_radial <= max_order:
+                        radial_prefactor = r_powers[N_radial]
+                    else:
+                        radial_prefactor = r**N_radial
+
+                    # Store AO values
+                    for idx in range(num_pl):
+                        ao_vals[iao] = radial_prefactor * phi[idx]
+                        iao += 1
+
+            # Now compute MO values: sum over AOs: MO_j = sum_i coeff_norm[j,i] * AO_i
+            val[pt, :] = coeff_norm @ ao_vals  # Matrix-vector product
 
         return val
 
-    def eval_molorb_derivs(self, pos, spin=0):
+    def eval_molorb_derivs_weave(self, pos, spin=0):
         """Evaluate molecular orbitals, gradients, and Laplacians.
 
         Args:
@@ -366,28 +827,212 @@ class stowfn:
         num_points = pos.shape[1]
         assert pos.shape == (3, num_points)
         num_molorbs = self.num_molorbs[spin]
-
         val = np.zeros((num_points, num_molorbs))
         grad = np.zeros((3, num_points, num_molorbs))
         lap = np.zeros((num_points, num_molorbs))
+        coeff_norm = self.coeff_norm[spin]
+        dict = mapunion(self.__dict__, locals())
+        weave_inline(support_code, eval_code, dict, ['EVAL_MOLORBS', 'CALC_DERIVS'])
+        return val, grad, lap
 
-        stowfn_cpp.eval_molorb_derivs(
-            pos.astype(float),  # (3, num_points)
-            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
-            self.centrepos.astype(float),  # (num_centres,3)
-            np.asarray(self.coeff_norm[spin], dtype=float),  # (num_molorbs,num_atorbs)
-            val,  # (num_points,num_molorbs) output
-            grad,  # (3,num_points,num_molorbs) output
-            lap,  # (num_points,num_molorbs) output
-        )
+    def eval_molorb_derivs(self, pos, spin=0):
+        """Evaluate molecular orbitals, gradients, and Laplacians.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+            spin (int, optional): Spin index (0 for alpha, 1 for beta if unrestricted).
+
+        Returns:
+            tuple:
+                - val (numpy.ndarray): Orbital values (num_points, num_molorbs).
+                - grad (numpy.ndarray): Orbital gradients (3, num_points, num_molorbs).
+                - lap (numpy.ndarray): Orbital Laplacians (num_points, num_molorbs).
+        """
+        # Cutoff for exp(-zeta*r) to avoid underflow
+        sto_exp_cutoff = 746.0
+        # Shell type to number of functions and first polynomial index
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Input validation
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points)
+        num_molorbs = self.num_molorbs[spin]
+
+        # Output: MO values, gradient, laplacian at each point
+        val = np.zeros((num_points, num_molorbs))
+        grad = np.zeros((3, num_points, num_molorbs))
+        lap = np.zeros((num_points, num_molorbs))
+        coeff_norm = self.coeff_norm[spin]
+
+        # Initialize arrays from eval_code
+        poly = np.zeros(25)  # Polynomial terms
+        phi = np.zeros(9)  # Basis functions for a shell
+        dpoly = np.zeros((3, 25))  # Gradients of polynomial terms
+        dphi = np.zeros((3, 9))  # Gradients of basis functions
+        ddphi = np.zeros(9)  # Laplacians of basis functions
+        r = np.zeros(self.max_order_r + 2)  # Radial terms (index -1 to max_order_r)
+
+        # Loop over points
+        for pt in range(num_points):
+            n_shell = 0
+            n_atorb = 0
+
+            # Loop over centers
+            for centre in range(self.num_centres):
+                # Compute relative coordinates
+                x = pos[0, pt] - self.centrepos[centre, 0]
+                y = pos[1, pt] - self.centrepos[centre, 1]
+                z = pos[2, pt] - self.centrepos[centre, 2]
+                xx = x * x
+                yy = y * y
+                zz = z * z
+
+                # Compute radial terms
+                r[2] = xx + yy + zz
+                r[1] = np.sqrt(r[2])
+                for i in range(3, self.max_order_r_on_centre[centre] + 1):
+                    r[i] = r[i - 1] * r[1]
+                if self.max_order_r_on_centre[centre] > 0:
+                    r[0] = 1
+                    r[-1] = 1 / r[1] if r[1] != 0 else 0
+
+                # Normalized coordinates
+                xnorm = x * r[-1] if r[1] != 0 else 0
+                ynorm = y * r[-1] if r[1] != 0 else 0
+                znorm = z * r[-1] if r[1] != 0 else 0
+
+                # Compute polynomial terms for s and p shells
+                poly[0] = 1  # s
+                poly[1] = x  # px
+                poly[2] = y  # py
+                poly[3] = z  # pz
+
+                # Compute derivatives for s and p shells
+                dpoly[:, 0] = [0, 0, 0]  # s
+                dpoly[:, 1] = [1, 0, 0]  # px
+                dpoly[:, 2] = [0, 1, 0]  # py
+                dpoly[:, 3] = [0, 0, 1]  # pz
+
+                # Compute polynomial terms for d and higher shells
+                if self.max_shell_type_on_centre[centre] >= 4:
+                    xy = x * y
+                    yz = y * z
+                    zx = z * x
+
+                    # d shell polynomials
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zz - r[2]
+                    poly[8] = xx - yy
+
+                    # d shell derivatives
+                    dpoly[:, 4] = [y, x, 0]
+                    dpoly[:, 5] = [0, z, y]
+                    dpoly[:, 6] = [z, 0, x]
+                    dpoly[:, 7] = [-2 * x, -2 * y, 4 * z]
+                    dpoly[:, 8] = [2 * x, -2 * y, 0]
+
+                    if self.max_shell_type_on_centre[centre] >= 5:
+                        # f shell polynomials
+                        poly[9] = (2 * zz - 3 * (xx + yy)) * z
+                        poly[10] = (5 * zz - r[2]) * x
+                        poly[11] = (5 * zz - r[2]) * y
+                        poly[12] = (xx - yy) * z
+                        poly[13] = xy * z
+                        poly[14] = (xx - 3 * yy) * x
+                        poly[15] = (3 * xx - yy) * y
+
+                        # f shell derivatives
+                        dpoly[:, 9] = [-6 * zx, -6 * yz, 6 * zz - 3 * (xx + yy)]
+                        dpoly[:, 10] = [4 * zz - yy - 3 * xx, -2 * xy, 8 * zx]
+                        dpoly[:, 11] = [-2 * xy, 4 * zz - xx - 3 * yy, 8 * yz]
+                        dpoly[:, 12] = [2 * zx, -2 * yz, xx - yy]
+                        dpoly[:, 13] = [yz, zx, xy]
+                        dpoly[:, 14] = [3 * xx - 3 * yy, -6 * xy, 0]
+                        dpoly[:, 15] = [6 * xy, 3 * xx - 3 * yy, 0]
+
+                        if self.max_shell_type_on_centre[centre] >= 6:
+                            # g shell polynomials
+                            xx_yy3 = xx - 3 * yy
+                            xx3_yy = 3 * xx - yy
+                            xx_yy = xx - yy
+                            zz5 = 5 * zz
+                            zz7 = 7 * zz
+                            rr3 = 3 * r[2]
+                            zz7_rr = zz7 - r[2]
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * (zz7_rr3) - (zz5 - r[2]) * rr3
+                            poly[17] = zx * (zz7_rr3)
+                            poly[18] = yz * (zz7_rr3)
+                            poly[19] = xx_yy * (zz7_rr)
+                            poly[20] = xy * (zz7_rr)
+                            poly[21] = zx * (xx_yy3)
+                            poly[22] = yz * (xx3_yy)
+                            poly[23] = xx * (xx_yy3) - yy * (xx3_yy)
+                            poly[24] = xy * (xx_yy)
+
+                            # g shell derivatives are not implemented
+                            if self.max_shell_type_on_centre[centre] >= 6:
+                                raise NotImplementedError('Gradient and Laplacian of g orbitals not yet implemented')
+
+                # Loop over shells on this center
+                for shell in range(self.num_shells_on_centre[centre]):
+                    zeta_rabs = self.zeta[n_shell] * r[1]
+                    if zeta_rabs > sto_exp_cutoff:
+                        n_atorb += num_poly_in_shell_type[self.shelltype[n_shell]]
+                        n_shell += 1
+                        continue
+
+                    exp_zeta_rabs = np.exp(-zeta_rabs)
+                    start = first_poly_in_shell_type[self.shelltype[n_shell]]
+                    end = start + num_poly_in_shell_type[self.shelltype[n_shell]]
+                    X = slice(0, end - start)
+                    A = slice(start, end)
+
+                    # Compute basis functions
+                    phi[X] = poly[A] * exp_zeta_rabs
+
+                    # Compute derivatives
+                    dphi[0, X] = dpoly[0, A] * exp_zeta_rabs - self.zeta[n_shell] * xnorm * phi[X]
+                    dphi[1, X] = dpoly[1, A] * exp_zeta_rabs - self.zeta[n_shell] * ynorm * phi[X]
+                    dphi[2, X] = dpoly[2, A] * exp_zeta_rabs - self.zeta[n_shell] * znorm * phi[X]
+                    ddphi[X] = (
+                        -2 * self.zeta[n_shell] * r[-1] * (x * dpoly[0, A] + y * dpoly[1, A] + z * dpoly[2, A] + poly[A])
+                        + self.zeta[n_shell] ** 2 * poly[A]
+                    ) * exp_zeta_rabs
+
+                    N = self.order_r_in_shell[n_shell]
+
+                    if N == 0:
+                        # No radial prefactor
+                        for pl in range(num_poly_in_shell_type[self.shelltype[n_shell]]):
+                            val[pt, :] += coeff_norm[:, n_atorb] * phi[pl]
+                            grad[0, pt, :] += coeff_norm[:, n_atorb] * dphi[0, pl]
+                            grad[1, pt, :] += coeff_norm[:, n_atorb] * dphi[1, pl]
+                            grad[2, pt, :] += coeff_norm[:, n_atorb] * dphi[2, pl]
+                            lap[pt, :] += coeff_norm[:, n_atorb] * ddphi[pl]
+                            n_atorb += 1
+                    else:
+                        # With radial prefactor
+                        for pl in range(num_poly_in_shell_type[self.shelltype[n_shell]]):
+                            val[pt, :] += coeff_norm[:, n_atorb] * r[N] * phi[pl]
+                            grad[0, pt, :] += coeff_norm[:, n_atorb] * (N * x * r[N - 2] * phi[pl] + r[N] * dphi[0, pl])
+                            grad[1, pt, :] += coeff_norm[:, n_atorb] * (N * y * r[N - 2] * phi[pl] + r[N] * dphi[1, pl])
+                            grad[2, pt, :] += coeff_norm[:, n_atorb] * (N * z * r[N - 2] * phi[pl] + r[N] * dphi[2, pl])
+                            lap[pt, :] += coeff_norm[:, n_atorb] * (
+                                N * (N + 1) * r[N - 2] * phi[pl]
+                                + 2 * N * r[N - 2] * (x * dphi[0, pl] + y * dphi[1, pl] + z * dphi[2, pl])
+                                + r[N] * ddphi[pl]
+                            )
+                            n_atorb += 1
+                    n_shell += 1
 
         return val, grad, lap
 
-    def eval_atorbs(self, pos):
+    def eval_atorbs_weave(self, pos):
         """Evaluate atomic orbitals (AOs) at given positions.
 
         Args:
@@ -399,32 +1044,202 @@ class stowfn:
         num_points = pos.shape[1]
         assert pos.shape == (3, num_points)
         atorbs = np.zeros((num_points, self.num_atorbs))
-        stowfn_cpp.eval_atorbs(
-            pos.astype(float),  # (3,num_points)
-            self.centrepos.astype(float),  # (num_centres,3)
-            np.asarray(self.num_shells_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.max_shell_type_on_centre, dtype=np.int32),  # (num_centres,)
-            np.asarray(self.shelltype, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.order_r_in_shell, dtype=np.int32),  # (num_shells_total,)
-            np.asarray(self.zeta, dtype=float),  # (num_shells_total,)
-            atorbs,  # output
-        )
+        dict = mapunion(self.__dict__, locals())
+        weave_inline(support_code, eval_code, dict, ['EVAL_ATORBS'])
         return atorbs
 
-    def get_norm(self):
+    def eval_atorbs(self, pos):
+        """
+        Evaluate atomic orbitals (AOs) at given positions.
+
+        Args:
+            pos (numpy.ndarray): Array of shape (3, num_points) with Cartesian coordinates.
+
+        Returns:
+            numpy.ndarray: AO values (num_points, num_atorbs).
+        """
+        num_points = pos.shape[1]
+        assert pos.shape == (3, num_points), f'pos must have shape (3, {num_points})'
+
+        # Output array
+        atorbs = np.zeros((num_points, self.num_atorbs))
+
+        # Shell type to number of functions and first index
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+
+        # Loop over each point
+        for pt in range(num_points):
+            x = pos[0, pt] - self.centrepos[:, 0]
+            y = pos[1, pt] - self.centrepos[:, 1]
+            z = pos[2, pt] - self.centrepos[:, 2]
+            r2 = x * x + y * y + z * z
+            r = np.sqrt(r2)
+
+            n_atorb = 0
+            for centre in range(self.num_centres):
+                xc, yc, zc = x[centre], y[centre], z[centre]
+                rc, r2c = r[centre], r2[centre]
+
+                # Compute radial terms up to max_order_r_on_centre[centre]
+                max_r_order = self.max_order_r_on_centre[centre]
+                r_power = np.ones(max_r_order + 1)
+                if max_r_order >= 1:
+                    r_power[1] = rc
+                    for i in range(2, max_r_order + 1):
+                        r_power[i] = r_power[i - 1] * rc
+
+                # Initialize polynomial basis functions
+                poly = np.zeros(25)
+                poly[0] = 1.0
+                poly[1] = xc
+                poly[2] = yc
+                poly[3] = zc
+
+                shelltype_max = self.max_shell_type_on_centre[centre]
+                if shelltype_max >= 4:  # d or higher
+                    xy = xc * yc
+                    yz = yc * zc
+                    zx = zc * xc
+                    poly[4] = xy
+                    poly[5] = yz
+                    poly[6] = zx
+                    poly[7] = 3 * zc**2 - r2c
+                    poly[8] = xc**2 - yc**2
+
+                    if shelltype_max >= 5:  # f or higher
+                        t1 = 5 * zc**2 - r2c
+                        poly[9] = (2 * zc**2 - 3 * (xc**2 + yc**2)) * zc
+                        poly[10] = t1 * xc
+                        poly[11] = t1 * yc
+                        poly[12] = (xc**2 - yc**2) * zc
+                        poly[13] = xy * zc
+                        poly[14] = (xc**2 - 3 * yc**2) * xc
+                        poly[15] = (3 * xc**2 - yc**2) * yc
+
+                        if shelltype_max >= 6:  # g shells
+                            xx_yy3 = xc**2 - 3 * yc**2
+                            xx3_yy = 3 * xc**2 - yc**2
+                            xx_yy = xc**2 - yc**2
+                            zz5 = 5 * zc**2
+                            zz7 = 7 * zc**2
+                            rr3 = 3 * r2c
+                            zz7_rr = zz7 - r2c
+                            zz7_rr3 = zz7 - rr3
+
+                            poly[16] = zz5 * zz7_rr3 - (zz5 - r2c) * rr3  # 35zzzz - 30zzrr + 3rrrr
+                            poly[17] = zx * zz7_rr3  # xz(7zz - 3rr)
+                            poly[18] = yz * zz7_rr3  # yz(7zz - 3rr)
+                            poly[19] = xx_yy * zz7_rr  # (xx-yy)(7zz-rr)
+                            poly[20] = xy * zz7_rr  # xy(7zz-rr)
+                            poly[21] = zx * xx_yy3  # xz(xx-3yy)
+                            poly[22] = yz * xx3_yy  # yz(3xx-yy)
+                            poly[23] = xc**2 * xx_yy3 - yc**2 * xx3_yy  # xxxx - 6xxyy + yyyy
+                            poly[24] = xy * xx_yy  # xxxy - xyyy
+
+                # Process each shell on this centre
+                start_shell = self.idx_first_shell_on_centre[centre]
+                end_shell = self.idx_first_shell_on_centre[centre + 1]
+
+                for shell_idx in range(start_shell, end_shell):
+                    stype = self.shelltype[shell_idx]
+                    N = self.order_r_in_shell[shell_idx]
+                    zeta_val = self.zeta[shell_idx]
+
+                    zeta_r = zeta_val * rc
+                    if zeta_r > 746.0:  # cutoff
+                        n_atorb += num_poly_in_shell_type[stype]
+                        continue
+
+                    exp_factor = np.exp(-zeta_r)
+
+                    first_pl = first_poly_in_shell_type[stype]
+                    num_pl = num_poly_in_shell_type[stype]
+                    A = slice(first_pl, first_pl + num_pl)
+
+                    phi = poly[A] * exp_factor
+
+                    # Apply radial power
+                    radial_prefactor = r_power[N] if N <= max_r_order else rc**N
+
+                    for pl in range(num_pl):
+                        atorbs[pt, n_atorb] = radial_prefactor * phi[pl]
+                        n_atorb += 1
+
+        return atorbs
+
+    def get_norm_weave(self):
         """Compute normalization factors for atomic orbitals.
 
         Returns:
             numpy.ndarray: Norms of each AO (num_atorbs,).
         """
         norm = np.zeros((self.num_atorbs,))
-        stowfn_cpp.compute_norm(
-            np.array(self.num_shells_on_centre, dtype=np.int32),
-            np.array(self.shelltype, dtype=np.int32),
-            np.array(self.order_r_in_shell, dtype=np.int32),
-            np.array(self.zeta, dtype=float),
-            norm,
-        )
+        dict = mapunion(self.__dict__, locals())
+        weave_inline(support_code, norm_code, dict)
+        return norm
+
+    def get_norm(self):
+        """Compute normalization factors for atomic orbitals."""
+
+        pi = np.pi
+        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
+        polypow = np.array([0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+        # normalization table for polynomials
+        polynorm = np.zeros(25)
+        # S-shell:
+        polynorm[0] = sqrt(1.0 / (4.0 * pi))  # 1
+        # P-shell:
+        polynorm[1] = sqrt(3.0 / (4.0 * pi))  # x
+        polynorm[2] = sqrt(3.0 / (4.0 * pi))  # y
+        polynorm[3] = sqrt(3.0 / (4.0 * pi))  # z
+        # D-shell:
+        polynorm[4] = 0.5 * sqrt(15.0 / pi)  # xy
+        polynorm[5] = 0.5 * sqrt(15.0 / pi)  # yz
+        polynorm[6] = 0.5 * sqrt(15.0 / pi)  # zx
+        polynorm[7] = 0.25 * sqrt(5.0 / pi)  # 3zz - r^2
+        polynorm[8] = 0.25 * sqrt(15.0 / pi)  # xx - yy
+        # F-shell:
+        polynorm[9] = 0.25 * sqrt(7.0 / pi)  # (2*zz-3*(xx+yy))*z
+        polynorm[10] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*x
+        polynorm[11] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*y
+        polynorm[12] = 0.25 * sqrt(105.0 / pi)  # (xx-yy)*z
+        polynorm[13] = 0.5 * sqrt(105.0 / pi)  # xy*z
+        polynorm[14] = 0.25 * sqrt(17.5 / pi)  # (xx-3.0*yy)*x
+        polynorm[15] = 0.25 * sqrt(17.5 / pi)  # (3.0*xx-yy)*y
+        # G-shell:
+        polynorm[16] = 0.1875 * sqrt(1.0 / pi)  # 35zzzz-30zzrr+3rrrr
+        polynorm[17] = 0.75 * sqrt(2.5 / pi)  # xz(7zz-3rr)
+        polynorm[18] = 0.75 * sqrt(2.5 / pi)  # yz(7zz-3rr)
+        polynorm[19] = 0.375 * sqrt(5.0 / pi)  # (xx-yy)(7zz-rr)
+        polynorm[20] = 0.75 * sqrt(5.0 / pi)  # xy(7zz-rr)
+        polynorm[21] = 0.75 * sqrt(17.5 / pi)  # xz(xx-3yy)
+        polynorm[22] = 0.75 * sqrt(17.5 / pi)  # yz(3xx-yy)
+        polynorm[23] = 0.1875 * sqrt(35.0 / pi)  # xxxx-6xxyy+yyyy
+        polynorm[24] = 0.75 * sqrt(35.0 / pi)  # xxxy-xyyy
+
+        norm = np.zeros(self.num_atorbs)
+        n_shell = n_atorb = 0
+
+        # main double loop over centers and shells
+        for centre in range(self.num_centres):
+            for shell in range(self.num_shells_on_centre[centre]):
+                nshell = n_shell
+                shelltype = self.shelltype[nshell]
+                order_r = self.order_r_in_shell[nshell]
+                zeta = self.zeta[nshell]
+
+                first_poly = first_poly_in_shell_type[shelltype]
+                num_poly = num_poly_in_shell_type[shelltype]
+
+                for pl in range(first_poly, first_poly + num_poly):
+                    n = polypow[pl] + order_r + 1
+                    norm[n_atorb] = polynorm[pl] * (2 * zeta) ** n * sqrt(2 * zeta / factorial(2 * n))
+                    n_atorb += 1
+
+                n_shell += 1
+
         return norm
 
     def iter_atorbs(self):
@@ -438,12 +1253,11 @@ class stowfn:
                 - N: radial order
                 - pl: polynomial index within shell
         """
-        nshell = 0
-        atorb = 0
+        atorb = nshell = 0
         for centre in range(self.num_centres):
             for _shell in range(self.num_shells_on_centre[centre]):
                 for pl in range(num_orbs_per_shelltype[self.shelltype[nshell]]):
-                    yield (atorb, centre, nshell, self.order_r_in_shell[nshell], pl)
+                    yield atorb, centre, nshell, self.order_r_in_shell[nshell], pl
                     atorb += 1
                 nshell += 1
 
@@ -454,7 +1268,7 @@ class stowfn:
             numpy.ndarray: Matrix of shape (num_centres, num_atorbs) imposing nuclear cusp conditions.
         """
         norm = self.get_norm()
-        res = np.asmatrix(np.zeros((self.num_centres, self.num_atorbs)))
+        res = np.zeros((self.num_centres, self.num_atorbs))
         for core in range(self.num_centres):
             atorb_vals = self.eval_atorbs(self.centrepos[core][:, None])[0, :]
             for atorb, centre, nshell, N, _pl in self.iter_atorbs():
@@ -472,17 +1286,12 @@ class stowfn:
         """Construct the projection matrix that enforces the cusp condition.
 
         Returns:
-            numpy.ndarray: Projector matrix (num_atorbs, num_atorbs).
+            numpy.ndarray: Projector matrix Q = I - P of shape (num_atorbs, num_atorbs),
+                           which projects onto the subspace satisfying A @ x = 0,
+                           where A is the cusp constraint matrix.
         """
-        # print "cusp_constraint: ",cusp_constraint
-        _U, _S, Vh = np.linalg.svd(self.cusp_constraint_matrix(), full_matrices=False)
-        # print "shapes U,S,Vh",U.shape,S.shape,Vh.shape
-        P = Vh.T * Vh
-        # print "proj shape",cusp_constraint_projector.shape
-        # print "proj trace",P.trace()
-        # print "proj squarediff",np.linalg.norm(P - P*P)
-        Q = np.eye(P.shape[0]) - P
-        return Q
+        Q_ns = null_space(self.cusp_constraint_matrix())
+        return Q_ns @ Q_ns.T
 
     def cusp_fixed_atorbs(self):
         """Determine the atomic orbitals fixed by the cusp constraint.
@@ -508,25 +1317,13 @@ class stowfn:
         constraint = self.cusp_constraint_matrix()
         res = constraint + 0.0
         res[:, cusp_fixed_atorb] = 0.0
-        U, S, Vh = np.linalg.svd(constraint[:, cusp_fixed_atorb], full_matrices=False)
-        tmpinv = Vh.T * np.asmatrix(np.diag(1 / S)) * U.T
-        res = -tmpinv * res
-        mat = np.asmatrix(np.eye(self.num_atorbs))
-        mat[cusp_fixed_atorb, :] = res
+        U, sigma, Vh = np.linalg.svd(constraint[:, cusp_fixed_atorb], full_matrices=False)
+        inv = Vh.T @ np.diag(1 / sigma) @ U.T
+        mat = np.eye(self.num_atorbs)
+        mat[cusp_fixed_atorb, :] = -inv @ res
         return mat
 
 
 if __name__ == '__main__':
-    sto = stowfn('stowfn.data')
+    sto = StoWfn('stowfn.data')
     sto.read_molorbmods('correlation.data')
-    points = np.zeros((3, 4))
-    points[:, 0] = (-0.19450689, -0.94412413, -0.67370571)
-    points[:, :] = points[:, :1]
-    points[0, 1] += 0.00317100
-    points[1, 2] += 0.00317100
-    points[2, 3] += 0.00317100
-    val, grad, lap = sto.eval_molorb_derivs(points)
-    print('grad analytic:', grad[:, 0])
-    print('grad numeric:', (val[1:] - val[0]) / 0.00317100)
-#    print sto.get_norm()
-#    sto.writefile("stowfn.data.out")
