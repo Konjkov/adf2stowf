@@ -84,3 +84,13 @@ the rest like the s-type contaminant (x²+y²+z²) and implicitly assumes they a
 ❗ Important note on energy: Even after projection, and especially without it, the total energy may not match the original
 Cartesian-basis energy because you’re removing unphysical (but energetically stabilizing) components without fully reconstructing
 the wavefunction in the pure spherical basis.
+
+## Performance Optimization Tips
+
+For better performance when using this converter:
+
+1. Ensure you have the latest version of NumPy installed, as newer versions often include performance improvements
+2. Consider using `float32` instead of `float64` if precision allows, to reduce memory usage and computation time
+3. For large calculations, consider processing spins in parallel using Python's multiprocessing capabilities
+4. When possible, use only occupied orbitals (`--all-orbitals` disabled) to reduce computational load
+5. Profile your specific use case to identify bottlenecks using the provided profiling script
