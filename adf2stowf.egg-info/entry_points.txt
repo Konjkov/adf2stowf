@@ -1,0 +1,2 @@
+[console_scripts]
+adf2stowf = adf2stowf.adf2stowf:main

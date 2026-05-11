@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+adf2stowf/__init__.py
+adf2stowf/adf2stowf.py
+adf2stowf/adfread.py
+adf2stowf/stowfn.py
+adf2stowf.egg-info/PKG-INFO
+adf2stowf.egg-info/SOURCES.txt
+adf2stowf.egg-info/dependency_links.txt
+adf2stowf.egg-info/entry_points.txt
+adf2stowf.egg-info/requires.txt
+adf2stowf.egg-info/top_level.txt
