@@ -1,10 +1,21 @@
 ADF to CASINO converter
 =======================
 
-This package converts wave function data output from the ADF program into
-an input file for the CASINO quantum Monte Carlo program.
+This package converts wave function data output from the **ADF** (Amsterdam
+Density Functional) program into the ``stowfn.data`` input file for the
+**CASINO** quantum Monte Carlo code.
 
-For general information about the ADF program, see https://www.scm.com/
+ADF is the only major quantum chemistry program that uses
+`Slater-Type Orbitals <https://en.wikipedia.org/wiki/Slater-type_orbital>`_
+(STO) natively.  CASINO can use them directly by setting::
+
+    atom_basis_type : slater-type
+
+in the CASINO input file, which makes ADF+CASINO a powerful combination for
+high-accuracy QMC calculations without the need for a GTO-to-STO re-expansion.
+
+For general information about ADF, see https://www.scm.com/.
+For CASINO, see https://casino.ph.utexas.edu/.
 
 .. toctree::
    :maxdepth: 2
@@ -15,19 +26,6 @@ For general information about the ADF program, see https://www.scm.com/
    adfread
    adf2stowf
    stowfn
-
-Requirements
-------------
-
-The script has been verified to work with:
-
-* Python 3.9.23
-* NumPy 1.24.4
-* SciPy 1.13.1
-
-For optional plotting of the cusp constraints:
-
-* Matplotlib >= 3.9.0
 
 Indices and tables
 ==================

@@ -27,7 +27,7 @@ class ADFToStoWF:
         self.initialize_data()
 
     def initialize_data(self):
-        """Main data sections from the parsed ADF TAPE21 file"""
+        """Load TAPE21 sections into named attributes and optionally dump them."""
         if self.DO_DUMP:
             self.parser.write_dump('TAPE21.txt')
 
@@ -38,6 +38,11 @@ class ADFToStoWF:
         self.Core = self.data['Core']
         self.Symmetry = self.data['Symmetry']
 
+        self._parse_system()
+        self.Nharmpoly_per_shelltype, self.Ncartpoly_per_shelltype, self.harm2cart_map, self.cart2harm_map = self._build_cart2harm_maps()
+
+    def _parse_system(self):
+        """Extract scalar system metadata and atom-type index from Geometry/General."""
         self.Nspins = self.General['nspin'][0]
         self.spin_restricted = self.Nspins == 1
         self.Nvalence_electrons = int(self.General['electrons'][0])
@@ -49,32 +54,44 @@ class ADFToStoWF:
         assert self.Geometry['nr of atoms'] == self.Natoms + self.Ndummies
         assert self.Geometry['nr of atomtypes'] == self.Natomtypes + self.Ndummytypes
 
-        self.atyp_idx = self.Geometry['fragment and atomtype index'].reshape(2, self.Natoms + self.Ndummies)[1, :] - 1
-        assert len(self.atyp_idx) == self.Natoms + self.Ndummies
-        assert np.all(0 <= self.atyp_idx[0 : self.Natoms])
-        assert np.all(self.atyp_idx[0 : self.Natoms] < self.Natomtypes)
-        assert np.all(self.Natomtypes <= self.atyp_idx[self.Natoms : self.Natoms + self.Ndummies])
-        assert np.all(self.atyp_idx[self.Natoms : self.Natoms + self.Ndummies] < self.Natomtypes + self.Ndummytypes)
-        self.atyp_idx = self.atyp_idx[: self.Natoms]
+        # atyp_idx: zero-based atom-type index for each atom (real + dummy)
+        atyp_idx = self.Geometry['fragment and atomtype index'].reshape(2, self.Natoms + self.Ndummies)[1, :] - 1
+        assert len(atyp_idx) == self.Natoms + self.Ndummies
+        assert np.all(0 <= atyp_idx[: self.Natoms])
+        assert np.all(atyp_idx[: self.Natoms] < self.Natomtypes)
+        assert np.all(self.Natomtypes <= atyp_idx[self.Natoms :])
+        assert np.all(atyp_idx[self.Natoms :] < self.Natomtypes + self.Ndummytypes)
+        self.atyp_idx = atyp_idx[: self.Natoms]  # drop dummy atoms
 
         self.total_charge_per_atomtype = self.Geometry['atomtype total charge']
         self.atomicnumber_per_atomtype = np.array([int(c) for c in self.total_charge_per_atomtype])
         assert np.all(self.atomicnumber_per_atomtype[self.Natomtypes :] == 0)
 
-        self.Nharmpoly_per_shelltype = np.array([0, 1, 4, 3, 5, 7])
-        self.Ncartpoly_per_shelltype = np.array([0, 1, 0, 3, 6, 10])
-        self.harm2cart_map = {
-            # S-shell:
+    @staticmethod
+    def _build_cart2harm_maps():
+        """Return shell-type lookup tables and Cartesian<->spherical transformation matrices.
+
+        The harm2cart matrices follow the CASINO stowfdet.f90 polynomial ordering:
+
+        D-shell (shelltype=4), Cartesian order: xy, xz, yz, xx-yy, 2zz-xx-yy, S-contam
+          D(-2)=xy  D(-1)=yz  D(1)=xz  D(0)=2zz-xx-yy  D(2)=xx-yy  [S=x2+y2+z2]
+
+        F-shell (shelltype=5), Cartesian order: xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
+          F(0)=2zzz-3(xxz+yyz)  F(1)=4xzz-(xx+yy)x  F(-1)=4yzz-(xx+yy)y
+          F(2)=(xx-yy)z  F(-2)=xyz  F(3)=xxx-3xyy  F(-3)=3xxy-yyy
+          [P_x, P_y, P_z contaminants]
+        """
+        # Number of spherical / Cartesian functions per shell type code
+        # Index: shelltype code (0=unused, 1=s, 2=sp, 3=p, 4=d, 5=f)
+        Nharmpoly = np.array([0, 1, 4, 3, 5, 7])
+        Ncartpoly = np.array([0, 1, 0, 3, 6, 10])
+
+        harm2cart = {
+            # S-shell: trivial identity
             1: np.eye(1),
-            # P-shell:
+            # P-shell: trivial identity
             3: np.eye(3),
-            # from CASINO/stowfdet.f90 code:
-            #   poly(5)=xy         D(-2)
-            #   poly(6)=yz         D(-1)
-            #   poly(7)=xz         D( 1)
-            #   poly(8)=2zz-xx-yy  D( 0)
-            #   poly(9)=xx-yy      D( 2)
-            #                      S
+            # D-shell: 5 spherical rows + 1 s-contamination row
             4: np.array([
                 [0, 0, 0, -1,  1, 1],
                 [1, 0, 0,  0,  0, 0],
@@ -83,18 +100,7 @@ class ADFToStoWF:
                 [0, 1, 0,  0,  0, 0],
                 [0, 0, 0,  2,  0, 1],
             ]),
-            # F-shell:
-            # from CASINO/stowfdet.f90 code:
-            #    poly(10)=2zzz-3(xxz+yyz)  F( 0)
-            #    poly(11)=4xzz-(xx+yy)*x   F( 1)
-            #    poly(12)=4yzz-(xx+yy)*y   F(-1)
-            #    poly(13)=(xx-yy)*z        F( 2)
-            #    poly(14)=xyz              F(-2)
-            #    poly(15)=xxx-3xyy         F( 3)
-            #    poly(16)=3xx-yyy          F(-3)
-            #                              P_x
-            #                              P_y
-            #                              P_z
+            # F-shell: 7 spherical rows + 3 p-contamination rows
             5: np.array([
                 [ 0, -1,  0,  0, 0,  1,  0, 1, 0, 0],
                 [ 0,  0, -1,  0, 0,  0,  3, 0, 1, 0],
@@ -106,9 +112,11 @@ class ADFToStoWF:
                 [-3,  0,  0, -1, 0,  0,  0, 0, 0, 1],
                 [ 0,  0,  4,  0, 0,  0,  0, 0, 1, 0],
                 [ 2,  0,  0,  0, 0,  0,  0, 0, 0, 1],
-            ])
+            ]),
         }  # fmt: skip
-        self.cart2harm_map = {st: np.linalg.inv(M) for st, M in self.harm2cart_map.items()}
+
+        cart2harm = {st: np.linalg.inv(M) for st, M in harm2cart.items()}
+        return Nharmpoly, Ncartpoly, harm2cart, cart2harm
 
     def process_valence_basis(self):
         self.nbset = self.Basis['nbset'][0]

@@ -8,8 +8,7 @@ Overview
 --------
 
 This module provides the :class:`StoWfn` class for working with Slater-Type
-Orbital (STO) wavefunction files as produced by quantum-chemistry codes such
-as AMOLQC.  It handles:
+Orbital (STO) wavefunction files in the format used by CASINO.  It handles:
 
 * Parsing and serialising the structured plain-text ``.data`` file format;
 * Evaluating atomic orbitals (AOs), molecular orbitals (MOs), their

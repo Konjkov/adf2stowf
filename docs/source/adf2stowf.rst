@@ -507,6 +507,8 @@ Usage examples
    print('Number of MOs:', sto.num_molorbs)
 
 
+.. _cart-to-harm:
+
 Cartesian to spherical-harmonic transformation
 ----------------------------------------------
 
@@ -539,6 +541,8 @@ matrices following the CASINO ``stowfdet.f90`` polynomial ordering.  When
 transformation matrix are used to project out these components before the
 Cartesian-to-spherical mapping is applied.
 
+
+.. _cusp-conditions:
 
 Nuclear cusp conditions
 -----------------------

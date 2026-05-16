@@ -38,12 +38,12 @@ Command-Line Options
 .. option:: --cusp-method=enforce
 
     Apply cusp correction to active orbitals. **Default.**
-    See :doc:`math/cusp` for the mathematical details.
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --cusp-method=project
 
     Project out cusp-violating components from each orbital.
-    See :doc:`math/cusp` for the mathematical details.
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --cusp-method=none
 
@@ -61,7 +61,7 @@ Command-Line Options
 .. option:: --cart2harm-projection
 
     Enforce pure spherical harmonics via orthogonal projection.
-    See :doc:`math/cartesian` for details.
+    See :ref:`cart-to-harm` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --dump
 
