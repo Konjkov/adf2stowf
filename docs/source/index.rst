@@ -12,8 +12,9 @@ For general information about the ADF program, see https://www.scm.com/
 
    installation
    usage
-   api
-   math
+   adfread
+   adf2stowf
+   stowfn
 
 Requirements
 ------------
