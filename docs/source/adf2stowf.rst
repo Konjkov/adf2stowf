@@ -77,7 +77,7 @@ ADFToStoWF class
       Total number of valence electrons.
 
    .. attribute:: Natoms
-      :type int:
+      :type: int
 
       Number of real (non-dummy) atoms.
 
@@ -535,11 +535,127 @@ introducing redundant (contaminating) components:
      - 3 p-type: :math:`x(x^2+y^2+z^2)`,
        :math:`y(x^2+y^2+z^2)`, :math:`z(x^2+y^2+z^2)`
 
-The :attr:`cart2harm_map` dictionary encodes the per-shell transformation
-matrices following the CASINO ``stowfdet.f90`` polynomial ordering.  When
-``--cart2harm-projection`` is used, the contaminating rows of the
-transformation matrix are used to project out these components before the
-Cartesian-to-spherical mapping is applied.
+
+Basis function ordering
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The polynomial ordering within each shell type follows ``stowfdet.f90`` from
+CASINO.  Spherical functions are labelled by magnetic quantum number *m*;
+Cartesian monomials use exponent triples *(i, j, k)* with :math:`x^i y^j z^k`.
+
+**d-shell** — Cartesian order: :math:`xy,\ xz,\ yz,\ x^2{-}y^2,\ 2z^2{-}x^2{-}y^2,\ x^2{+}y^2{+}z^2`
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - *m*
+     - Real solid harmonic (unnormalized)
+   * - :math:`-2`
+     - :math:`xy`
+   * - :math:`-1`
+     - :math:`yz`
+   * - :math:`0`
+     - :math:`2z^2 - x^2 - y^2`
+   * - :math:`+1`
+     - :math:`xz`
+   * - :math:`+2`
+     - :math:`x^2 - y^2`
+   * - (s-contam)
+     - :math:`x^2 + y^2 + z^2`
+
+**f-shell** — Cartesian order: :math:`x^3,\ x^2y,\ x^2z,\ xy^2,\ xyz,\ xz^2,\ y^3,\ y^2z,\ yz^2,\ z^3`
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - *m*
+     - Real solid harmonic (unnormalized)
+   * - :math:`0`
+     - :math:`2z^3 - 3z(x^2+y^2)`
+   * - :math:`+1`
+     - :math:`4xz^2 - x(x^2+y^2)`
+   * - :math:`-1`
+     - :math:`4yz^2 - y(x^2+y^2)`
+   * - :math:`+2`
+     - :math:`(x^2-y^2)z`
+   * - :math:`-2`
+     - :math:`xyz`
+   * - :math:`+3`
+     - :math:`x^3 - 3xy^2`
+   * - :math:`-3`
+     - :math:`3x^2y - y^3`
+   * - (p-contam x)
+     - :math:`x(x^2+y^2+z^2)`
+   * - (p-contam y)
+     - :math:`y(x^2+y^2+z^2)`
+   * - (p-contam z)
+     - :math:`z(x^2+y^2+z^2)`
+
+
+Matrix equations
+~~~~~~~~~~~~~~~~
+
+For each shell, the :attr:`harm2cart_map` matrix **M** (shape
+:math:`N_\text{cart} \times N_\text{cart}`) relates spherical-harmonic
+coefficients :math:`\mathbf{c}_\text{sph}` to Cartesian coefficients
+:math:`\mathbf{c}_\text{cart}`:
+
+.. math::
+
+   \mathbf{c}_\text{cart} = \mathbf{M}\, \mathbf{c}_\text{sph}
+
+The matrix **M** is partitioned row-wise into a *physical* block and a
+*constraint* block:
+
+.. math::
+
+   \mathbf{M} =
+   \begin{pmatrix} \mathbf{M}_\text{phys} \\ \mathbf{A} \end{pmatrix}
+
+where :math:`\mathbf{M}_\text{phys}` has :math:`N_\text{sph}` rows (the true
+spherical harmonics) and :math:`\mathbf{A}` has :math:`N_\text{cart} -
+N_\text{sph}` rows (the contaminating components stored in
+:attr:`cart2harm_constraint`).
+
+The inverse transformation (stored in :attr:`cart2harm_map`) is:
+
+.. math::
+
+   \mathbf{c}_\text{sph} = \mathbf{M}^{-1}\, \mathbf{c}_\text{cart}
+
+and the physical block of :math:`\mathbf{M}^{-1}` gives the global
+:attr:`cart2harm_matrix` **C** (shape
+:math:`N_\text{harm}^\text{total} \times N_\text{cart}^\text{total}`),
+a block-diagonal matrix assembled over all centres and shells:
+
+.. math::
+
+   \mathbf{c}_\text{sph}^\text{MO} = \mathbf{C}\, \mathbf{c}_\text{cart}^\text{MO}
+
+**Contamination check.**  A Cartesian coefficient vector
+:math:`\mathbf{c}_\text{cart}` is *pure spherical* if and only if:
+
+.. math::
+
+   \mathbf{A}\, \mathbf{c}_\text{cart} = \mathbf{0}
+
+Violations are measured as
+:math:`\|\mathbf{A}\, \mathbf{c}_\text{cart}\|` and logged as warnings when
+they exceed :math:`10^{-5}`.
+
+**Projection (``--cart2harm-projection``).**  When contamination is present,
+the coefficient vector is projected onto the null space of **A** via:
+
+.. math::
+
+   \mathbf{c}_\text{proj} = \mathbf{Q}\mathbf{Q}^\top \mathbf{c}_\text{cart}
+
+where the columns of **Q** form an orthonormal basis for
+:math:`\ker(\mathbf{A})`, computed by ``scipy.linalg.null_space``.  After
+projection, :math:`\mathbf{A}\,\mathbf{c}_\text{proj} = \mathbf{0}` to
+machine precision.
 
 
 .. _cusp-conditions:
