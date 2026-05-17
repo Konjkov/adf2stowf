@@ -4,6 +4,7 @@ adf2stowf
 [![PyPI version](https://img.shields.io/pypi/v/adf2stowf.svg)](https://pypi.org/project/adf2stowf/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/adf2stowf.svg)](https://pypi.org/project/adf2stowf/)
 [![Tests](https://github.com/Konjkov/adf2stowf/actions/workflows/tests.yml/badge.svg)](https://github.com/Konjkov/adf2stowf/actions/workflows/tests.yml)
+[![Documentation](https://readthedocs.org/projects/adf2stowf/badge/?version=latest)](https://adf2stowf.readthedocs.io/en/latest/)
 
 Converts wave function data from the **ADF** (Amsterdam Density Functional)
 program into the `stowfn.data` input file for the **CASINO** quantum Monte
@@ -117,7 +118,9 @@ Documentation
 =============
 
 Full documentation including mathematical background (cusp conditions,
-Cartesian-to-spherical transformation matrices) is available in `docs/`.
+Cartesian-to-spherical transformation matrices) is available at
+https://adf2stowf.readthedocs.io/en/latest/
+
 To build locally:
 
 ```bash
