@@ -18,7 +18,7 @@ in the CASINO input file, which makes ADF+CASINO a powerful combination for
 high-accuracy QMC calculations.
 
 For general information about ADF, see https://www.scm.com/
-For CASINO, see https://casino.ph.utexas.edu/
+For CASINO, see https://vallico.net/casinoqmc/
 
 
 Requirements
