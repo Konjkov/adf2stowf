@@ -17,18 +17,18 @@ np.set_printoptions(
 class ADFToStoWF:
     def __init__(self, plot_cusps, cusp_method, do_dump, cart2harm_projection, only_occupied):
         """Initialize the ADFToStoWF object."""
-        self.PLOT_CUSPS = plot_cusps
-        self.CUSP_METHOD = cusp_method
-        self.DO_DUMP = do_dump
-        self.CART2HARM_PROJECTION = cart2harm_projection
-        self.ONLY_OCCUPIED = only_occupied
+        self.do_plot_cusps = plot_cusps
+        self.cusp_method = cusp_method
+        self.do_dump = do_dump
+        self.cart2harm_projection = cart2harm_projection
+        self.only_occupied = only_occupied
         self.parser = adfread.AdfParser('TAPE21.asc')
         self.data = self.parser.parse()
         self.initialize_data()
 
     def initialize_data(self):
-        """Main data sections from the parsed ADF TAPE21 file"""
-        if self.DO_DUMP:
+        """Load TAPE21 sections into named attributes and optionally dump them."""
+        if self.do_dump:
             self.parser.write_dump('TAPE21.txt')
 
         self.General = self.data['General']
@@ -38,6 +38,11 @@ class ADFToStoWF:
         self.Core = self.data['Core']
         self.Symmetry = self.data['Symmetry']
 
+        self._parse_system()
+        self.Nharmpoly_per_shelltype, self.Ncartpoly_per_shelltype, self.harm2cart_map, self.cart2harm_map = self._build_cart2harm_maps()
+
+    def _parse_system(self):
+        """Extract scalar system metadata and atom-type index from Geometry/General."""
         self.Nspins = self.General['nspin'][0]
         self.spin_restricted = self.Nspins == 1
         self.Nvalence_electrons = int(self.General['electrons'][0])
@@ -49,32 +54,50 @@ class ADFToStoWF:
         assert self.Geometry['nr of atoms'] == self.Natoms + self.Ndummies
         assert self.Geometry['nr of atomtypes'] == self.Natomtypes + self.Ndummytypes
 
-        self.atyp_idx = self.Geometry['fragment and atomtype index'].reshape(2, self.Natoms + self.Ndummies)[1, :] - 1
-        assert len(self.atyp_idx) == self.Natoms + self.Ndummies
-        assert np.all(0 <= self.atyp_idx[0 : self.Natoms])
-        assert np.all(self.atyp_idx[0 : self.Natoms] < self.Natomtypes)
-        assert np.all(self.Natomtypes <= self.atyp_idx[self.Natoms : self.Natoms + self.Ndummies])
-        assert np.all(self.atyp_idx[self.Natoms : self.Natoms + self.Ndummies] < self.Natomtypes + self.Ndummytypes)
-        self.atyp_idx = self.atyp_idx[: self.Natoms]
+        # atyp_idx: zero-based atom-type index for each atom (real + dummy)
+        atyp_idx = self.Geometry['fragment and atomtype index'].reshape(2, self.Natoms + self.Ndummies)[1, :] - 1
+        assert len(atyp_idx) == self.Natoms + self.Ndummies
+        assert np.all(0 <= atyp_idx[: self.Natoms])
+        assert np.all(atyp_idx[: self.Natoms] < self.Natomtypes)
+        assert np.all(self.Natomtypes <= atyp_idx[self.Natoms :])
+        assert np.all(atyp_idx[self.Natoms :] < self.Natomtypes + self.Ndummytypes)
+        self.atyp_idx = atyp_idx[: self.Natoms]  # drop dummy atoms
 
         self.total_charge_per_atomtype = self.Geometry['atomtype total charge']
         self.atomicnumber_per_atomtype = np.array([int(c) for c in self.total_charge_per_atomtype])
         assert np.all(self.atomicnumber_per_atomtype[self.Natomtypes :] == 0)
 
-        self.Nharmpoly_per_shelltype = np.array([0, 1, 4, 3, 5, 7])
-        self.Ncartpoly_per_shelltype = np.array([0, 1, 0, 3, 6, 10])
-        self.harm2cart_map = {
-            # S-shell:
+        self.nsym = self.Symmetry['nsym'][0]
+        self.symlab = self.Symmetry['symlab']
+        self.norb = self.Symmetry['norb']
+        assert len(self.symlab) == self.nsym
+        assert len(self.norb) == self.nsym
+
+    @staticmethod
+    def _build_cart2harm_maps():
+        """Return shell-type lookup tables and Cartesian<->spherical transformation matrices.
+
+        The harm2cart matrices follow the CASINO stowfdet.f90 polynomial ordering:
+
+        D-shell (shelltype=4), Cartesian order: xy, xz, yz, xx-yy, 2zz-xx-yy, S-contam
+          D(-2)=xy  D(-1)=yz  D(1)=xz  D(0)=2zz-xx-yy  D(2)=xx-yy  [S=x2+y2+z2]
+
+        F-shell (shelltype=5), Cartesian order: xxx, xxy, xxz, xyy, xyz, xzz, yyy, yyz, yzz, zzz
+          F(0)=2zzz-3(xxz+yyz)  F(1)=4xzz-(xx+yy)x  F(-1)=4yzz-(xx+yy)y
+          F(2)=(xx-yy)z  F(-2)=xyz  F(3)=xxx-3xyy  F(-3)=3xxy-yyy
+          [P_x, P_y, P_z contaminants]
+        """
+        # Number of spherical / Cartesian functions per shell type code
+        # Index: shelltype code (0=unused, 1=s, 2=sp, 3=p, 4=d, 5=f)
+        Nharmpoly = np.array([0, 1, 4, 3, 5, 7])
+        Ncartpoly = np.array([0, 1, 0, 3, 6, 10])
+
+        harm2cart = {
+            # S-shell: trivial identity
             1: np.eye(1),
-            # P-shell:
+            # P-shell: trivial identity
             3: np.eye(3),
-            # from CASINO/stowfdet.f90 code:
-            #   poly(5)=xy         D(-2)
-            #   poly(6)=yz         D(-1)
-            #   poly(7)=xz         D( 1)
-            #   poly(8)=2zz-xx-yy  D( 0)
-            #   poly(9)=xx-yy      D( 2)
-            #                      S
+            # D-shell: 5 spherical rows + 1 s-contamination row
             4: np.array([
                 [0, 0, 0, -1,  1, 1],
                 [1, 0, 0,  0,  0, 0],
@@ -83,18 +106,7 @@ class ADFToStoWF:
                 [0, 1, 0,  0,  0, 0],
                 [0, 0, 0,  2,  0, 1],
             ]),
-            # F-shell:
-            # from CASINO/stowfdet.f90 code:
-            #    poly(10)=2zzz-3(xxz+yyz)  F( 0)
-            #    poly(11)=4xzz-(xx+yy)*x   F( 1)
-            #    poly(12)=4yzz-(xx+yy)*y   F(-1)
-            #    poly(13)=(xx-yy)*z        F( 2)
-            #    poly(14)=xyz              F(-2)
-            #    poly(15)=xxx-3xyy         F( 3)
-            #    poly(16)=3xx-yyy          F(-3)
-            #                              P_x
-            #                              P_y
-            #                              P_z
+            # F-shell: 7 spherical rows + 3 p-contamination rows
             5: np.array([
                 [ 0, -1,  0,  0, 0,  1,  0, 1, 0, 0],
                 [ 0,  0, -1,  0, 0,  0,  3, 0, 1, 0],
@@ -106,9 +118,11 @@ class ADFToStoWF:
                 [-3,  0,  0, -1, 0,  0,  0, 0, 0, 1],
                 [ 0,  0,  4,  0, 0,  0,  0, 0, 1, 0],
                 [ 2,  0,  0,  0, 0,  0,  0, 0, 0, 1],
-            ])
+            ]),
         }  # fmt: skip
-        self.cart2harm_map = {st: np.linalg.inv(M) for st, M in self.harm2cart_map.items()}
+
+        cart2harm = {st: np.linalg.inv(M) for st, M in harm2cart.items()}
+        return Nharmpoly, Ncartpoly, harm2cart, cart2harm
 
     def process_valence_basis(self):
         self.nbset = self.Basis['nbset'][0]
@@ -212,9 +226,6 @@ class ADFToStoWF:
         molorb_occupation = []
         molorb_eigenvalue = []
         partial_occupations = {}
-        self.nsym = self.Symmetry['nsym'][0]
-        self.symlab = self.Symmetry['symlab']
-        self.norb = self.Symmetry['norb']
         assert len(self.symlab) == self.nsym
         assert len(self.norb) == self.nsym
         # Loop over all symmetries
@@ -227,7 +238,7 @@ class ADFToStoWF:
             froc_X = Section['froc_' + X]
             assert len(froc_X) == self.norb[sym]
             # Skip this symmetry only when we want only occupied orbitals
-            if np.all(froc_X == 0.0) and self.ONLY_OCCUPIED:
+            if np.all(froc_X == 0.0) and self.only_occupied:
                 continue
             # Indices of basis functions for this symmetry
             npart = Section['npart'] - 1
@@ -252,7 +263,7 @@ class ADFToStoWF:
                     molorb_cart_coeff.append(coeff)
                 else:
                     molorb_occupation.append(0)
-                    if not self.ONLY_OCCUPIED:
+                    if not self.only_occupied:
                         molorb_cart_coeff.append(coeff)
                 # Store leftover fractional occupation
                 if occ > 1e-8:
@@ -278,7 +289,7 @@ class ADFToStoWF:
             LUMO = min(unoccidx)
             if HOMO > LUMO:
                 print('Warning: HOMO > LUMO (may happen in some cases)')
-        if self.ONLY_OCCUPIED:
+        if self.only_occupied:
             # Keep only occupied eigenvalues
             molorb_eigenvalue = molorb_eigenvalue[occupied]
             # Number of occupied valence orbitals
@@ -304,7 +315,7 @@ class ADFToStoWF:
 
         self.molorb_cart_coeff = [self.select_coeff(sp) for sp in range(self.Nspins)]
         self.Nvalence_molorbs = np.array([c.shape[0] for c in self.molorb_cart_coeff])
-        if self.ONLY_OCCUPIED:
+        if self.only_occupied:
             assert np.sum(self.Nvalence_molorbs) * (3 - self.Nspins) == self.Nvalence_electrons
 
         self.cart2harm_matrix = np.zeros((self.Nharmbasfns, self.Nvalence_cartbasfn))
@@ -340,7 +351,7 @@ class ADFToStoWF:
                 if err > 1e-5:
                     print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
-        if self.CART2HARM_PROJECTION:
+        if self.cart2harm_projection:
             # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
             from scipy.linalg import null_space
 
@@ -481,21 +492,21 @@ class ADFToStoWF:
                     print(f'spin {sp}, orb {i}:')
                     print('    constraint violation by: ', constraint_violation)
                     print('    original coefficients:   ', self.coeff[sp][cusp_fixed_atorbs, i])
-                    if self.CUSP_METHOD == 'project':
+                    if self.cusp_method == 'project':
                         projected_coeff = cusp_projection @ self.coeff[sp][:, i]
                         print('    projection coefficients:\n', projected_coeff)
                         print('    after projection:         ', cusp_constraint @ projected_coeff)
                         self.coeff[sp][:, i] = projected_coeff
-                    if self.CUSP_METHOD == 'enforce':
+                    if self.cusp_method == 'enforce':
                         enforced_coeff = cusp_enforcing @ self.coeff[sp][:, i]
                         print('    constrained coefficients:', enforced_coeff[cusp_fixed_atorbs])
                         print('    after enforcing:         ', cusp_constraint @ enforced_coeff)
                         self.coeff[sp][:, i] = enforced_coeff
-                if self.CUSP_METHOD != 'none':
+                if self.cusp_method != 'none':
                     constraint_violation = cusp_constraint @ self.coeff[sp][:, i]
                     assert np.all(np.abs(constraint_violation) < 1e-8)
 
-        if self.PLOT_CUSPS:
+        if self.do_plot_cusps:
             # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
             self.z = np.linspace(-0.5, 0.5, 500)
             # Create offset array of shape (3, self.z.size)
@@ -514,7 +525,7 @@ class ADFToStoWF:
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
-        if self.PLOT_CUSPS:
+        if self.do_plot_cusps:
             self.val_post = [
                 [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
             ]
@@ -523,14 +534,14 @@ class ADFToStoWF:
                 for atom in range(self.sto.num_atom)
             ]
 
-        if self.CUSP_METHOD != 'none':
+        if self.cusp_method != 'none':
             print('Molorb values at nuclei after applying cusp constraint:')
             print(self.sto.eval_molorbs(self.sto.atompos.T))
 
         self.sto.writefile('stowfn.data')
 
     def plot_cusps(self):
-        if not self.PLOT_CUSPS:
+        if not self.do_plot_cusps:
             return
         import matplotlib.pyplot as plt
 
