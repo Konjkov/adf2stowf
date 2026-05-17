@@ -24,10 +24,10 @@ classifiers = [
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
 ]
-requires-python = ">=3.9,<3.12"
+requires-python = ">=3.9"
 dependencies = [
-    'numpy==1.24.4',
-    'scipy>=1.10.4',
+    'numpy>=1.24.4',
+    'scipy>=1.13.1',
     'matplotlib>=3.9.0',
 ]
 [project.urls]
