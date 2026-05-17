@@ -17,18 +17,18 @@ np.set_printoptions(
 class ADFToStoWF:
     def __init__(self, plot_cusps, cusp_method, do_dump, cart2harm_projection, only_occupied):
         """Initialize the ADFToStoWF object."""
-        self.PLOT_CUSPS = plot_cusps
-        self.CUSP_METHOD = cusp_method
-        self.DO_DUMP = do_dump
-        self.CART2HARM_PROJECTION = cart2harm_projection
-        self.ONLY_OCCUPIED = only_occupied
+        self.do_plot_cusps = plot_cusps
+        self.cusp_method = cusp_method
+        self.do_dump = do_dump
+        self.cart2harm_projection = cart2harm_projection
+        self.only_occupied = only_occupied
         self.parser = adfread.AdfParser('TAPE21.asc')
         self.data = self.parser.parse()
         self.initialize_data()
 
     def initialize_data(self):
         """Load TAPE21 sections into named attributes and optionally dump them."""
-        if self.DO_DUMP:
+        if self.do_dump:
             self.parser.write_dump('TAPE21.txt')
 
         self.General = self.data['General']
@@ -66,6 +66,12 @@ class ADFToStoWF:
         self.total_charge_per_atomtype = self.Geometry['atomtype total charge']
         self.atomicnumber_per_atomtype = np.array([int(c) for c in self.total_charge_per_atomtype])
         assert np.all(self.atomicnumber_per_atomtype[self.Natomtypes :] == 0)
+
+        self.nsym = self.Symmetry['nsym'][0]
+        self.symlab = self.Symmetry['symlab']
+        self.norb = self.Symmetry['norb']
+        assert len(self.symlab) == self.nsym
+        assert len(self.norb) == self.nsym
 
     @staticmethod
     def _build_cart2harm_maps():
@@ -220,9 +226,6 @@ class ADFToStoWF:
         molorb_occupation = []
         molorb_eigenvalue = []
         partial_occupations = {}
-        self.nsym = self.Symmetry['nsym'][0]
-        self.symlab = self.Symmetry['symlab']
-        self.norb = self.Symmetry['norb']
         assert len(self.symlab) == self.nsym
         assert len(self.norb) == self.nsym
         # Loop over all symmetries
@@ -235,7 +238,7 @@ class ADFToStoWF:
             froc_X = Section['froc_' + X]
             assert len(froc_X) == self.norb[sym]
             # Skip this symmetry only when we want only occupied orbitals
-            if np.all(froc_X == 0.0) and self.ONLY_OCCUPIED:
+            if np.all(froc_X == 0.0) and self.only_occupied:
                 continue
             # Indices of basis functions for this symmetry
             npart = Section['npart'] - 1
@@ -260,7 +263,7 @@ class ADFToStoWF:
                     molorb_cart_coeff.append(coeff)
                 else:
                     molorb_occupation.append(0)
-                    if not self.ONLY_OCCUPIED:
+                    if not self.only_occupied:
                         molorb_cart_coeff.append(coeff)
                 # Store leftover fractional occupation
                 if occ > 1e-8:
@@ -286,7 +289,7 @@ class ADFToStoWF:
             LUMO = min(unoccidx)
             if HOMO > LUMO:
                 print('Warning: HOMO > LUMO (may happen in some cases)')
-        if self.ONLY_OCCUPIED:
+        if self.only_occupied:
             # Keep only occupied eigenvalues
             molorb_eigenvalue = molorb_eigenvalue[occupied]
             # Number of occupied valence orbitals
@@ -312,7 +315,7 @@ class ADFToStoWF:
 
         self.molorb_cart_coeff = [self.select_coeff(sp) for sp in range(self.Nspins)]
         self.Nvalence_molorbs = np.array([c.shape[0] for c in self.molorb_cart_coeff])
-        if self.ONLY_OCCUPIED:
+        if self.only_occupied:
             assert np.sum(self.Nvalence_molorbs) * (3 - self.Nspins) == self.Nvalence_electrons
 
         self.cart2harm_matrix = np.zeros((self.Nharmbasfns, self.Nvalence_cartbasfn))
@@ -348,7 +351,7 @@ class ADFToStoWF:
                 if err > 1e-5:
                     print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
-        if self.CART2HARM_PROJECTION:
+        if self.cart2harm_projection:
             # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
             from scipy.linalg import null_space
 
@@ -489,21 +492,21 @@ class ADFToStoWF:
                     print(f'spin {sp}, orb {i}:')
                     print('    constraint violation by: ', constraint_violation)
                     print('    original coefficients:   ', self.coeff[sp][cusp_fixed_atorbs, i])
-                    if self.CUSP_METHOD == 'project':
+                    if self.cusp_method == 'project':
                         projected_coeff = cusp_projection @ self.coeff[sp][:, i]
                         print('    projection coefficients:\n', projected_coeff)
                         print('    after projection:         ', cusp_constraint @ projected_coeff)
                         self.coeff[sp][:, i] = projected_coeff
-                    if self.CUSP_METHOD == 'enforce':
+                    if self.cusp_method == 'enforce':
                         enforced_coeff = cusp_enforcing @ self.coeff[sp][:, i]
                         print('    constrained coefficients:', enforced_coeff[cusp_fixed_atorbs])
                         print('    after enforcing:         ', cusp_constraint @ enforced_coeff)
                         self.coeff[sp][:, i] = enforced_coeff
-                if self.CUSP_METHOD != 'none':
+                if self.cusp_method != 'none':
                     constraint_violation = cusp_constraint @ self.coeff[sp][:, i]
                     assert np.all(np.abs(constraint_violation) < 1e-8)
 
-        if self.PLOT_CUSPS:
+        if self.do_plot_cusps:
             # Build a z-axis line through each atom from -0.5 to 0.5 (relative units)
             self.z = np.linspace(-0.5, 0.5, 500)
             # Create offset array of shape (3, self.z.size)
@@ -522,7 +525,7 @@ class ADFToStoWF:
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
-        if self.PLOT_CUSPS:
+        if self.do_plot_cusps:
             self.val_post = [
                 [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
             ]
@@ -531,14 +534,14 @@ class ADFToStoWF:
                 for atom in range(self.sto.num_atom)
             ]
 
-        if self.CUSP_METHOD != 'none':
+        if self.cusp_method != 'none':
             print('Molorb values at nuclei after applying cusp constraint:')
             print(self.sto.eval_molorbs(self.sto.atompos.T))
 
         self.sto.writefile('stowfn.data')
 
     def plot_cusps(self):
-        if not self.PLOT_CUSPS:
+        if not self.do_plot_cusps:
             return
         import matplotlib.pyplot as plt
 
