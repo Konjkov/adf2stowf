@@ -1,86 +1,126 @@
-ADF
-===
+adf2stowf
+=========
 
-This directory contains a converter script that takes wave function data
-output from the ADF program and turns it into a input file for the CASINO
-program.
+[![PyPI version](https://img.shields.io/pypi/v/adf2stowf.svg)](https://pypi.org/project/adf2stowf/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/adf2stowf.svg)](https://pypi.org/project/adf2stowf/)
+[![Tests](https://github.com/Konjkov/adf2stowf/actions/workflows/tests.yml/badge.svg)](https://github.com/Konjkov/adf2stowf/actions/workflows/tests.yml)
 
-For general information about the ADF program, see http://www.scm.com/
+Converts wave function data from the **ADF** (Amsterdam Density Functional)
+program into the `stowfn.data` input file for the **CASINO** quantum Monte
+Carlo code.
+
+ADF is the only major quantum chemistry program that uses Slater-Type Orbitals
+(STO) natively. CASINO can use them directly by setting:
+
+    atom_basis_type : slater-type
+
+in the CASINO input file, which makes ADF+CASINO a powerful combination for
+high-accuracy QMC calculations.
+
+For general information about ADF, see https://www.scm.com/
+For CASINO, see https://casino.ph.utexas.edu/
 
 
 Requirements
 ============
 
-The script has been verified to work with:
+* Python >= 3.10
+* NumPy >= 2.0.0
+* SciPy >= 1.13.1
+* Matplotlib >= 3.9.0 (optional, for `--plot-cusps`)
 
-    Python 3.9.23
-    NumPy 1.24.4
-    SciPy 1.13.1
 
-For optional plotting of the cusp constraints
-
-    Matplotlib >=3.9.0
-
-To build the package from source, you must first install the required system dependencies. On Ubuntu/Debian-based systems, run:
+Installation
+============
 
 ```bash
-sudo apt update
-sudo apt install python3-dev python3-distutils python3-venv build-essential cmake
-cd source-dir
+pip install adf2stowf
+```
+
+or from source:
+
+```bash
+git clone https://github.com/Konjkov/adf2stowf
+cd adf2stowf
 pip install .
 ```
 
-or just `pip install adf2stowf`
 
 Usage
 =====
 
-Run the adf program, e.g.
+1. Run ADF:
 
-    adf < adf.in > adf.out
+       adf < adf.in > adf.out
 
-this should leave a binary file 'TAPE21' in the working directory.
-Convert this binary file into ASCII format:
+   This produces a binary file `TAPE21` in the working directory.
 
-    dmpkf TAPE21 > TAPE21.asc
+2. Convert to ASCII format using the `dmpkf` utility (included with ADF):
 
-(the dmpkf utility is included with the ADF distribution)
-Now run
+       dmpkf TAPE21 > TAPE21.asc
 
-    adf2stowf
+3. Run the converter in the same directory:
 
-in the same directory. This script will read 'TAPE21.asc' and write a file 'stowfn.data'.
-This file can be used by CASINO setting the option
+       adf2stowf
 
-    atom_basis_type   : slater-type
+   This reads `TAPE21.asc` and writes `stowfn.data`.
 
-in the CASINO input file.
 
-The following command-line options are supported:
-* `adf2stowf` — use default: `--cusp-method=enforce`
-* `adf2stowf --plot-cusps` — enables cusps plotting (default: disabled)
-* `adf2stowf --cusp-method=enforce` — apply transformation to active orbitals (default)
-* `adf2stowf --cusp-method=project` — project out cusp-violating components
-* `adf2stowf --cusp-method=none` — disable any cusp correction
-* `adf2stowf --all-orbitals` — include also virtual orbitals (default: only occupied)
-* `adf2stowf --dump` — generate a text dump of TAPE21.asc (default: no dump)
-* `adf2stowf --cart2harm-projection` — enforce pure spherical harmonics via projection
+Command-line options
+====================
 
-You may see a warning like this during conversion:
+| Option | Description |
+|--------|-------------|
+| `--cusp-method=enforce` | Apply cusp correction to active orbitals **(default)** |
+| `--cusp-method=project` | Project out cusp-violating components |
+| `--cusp-method=none` | Disable cusp correction |
+| `--cart2harm-projection` | Enforce pure spherical harmonics via orthogonal projection |
+| `--all-orbitals` | Include virtual orbitals (default: occupied only) |
+| `--plot-cusps` | Plot cusp constraints (requires Matplotlib) |
+| `--dump` | Write a text dump of TAPE21 to `TAPE21.txt` |
 
-    WARNING: cartesian to sperical conversion for spin 0, orb 0 violated by 0.00063567
 
-This indicates that the original molecular orbitals (computed in Cartesian Gaussian basis) contain
-non-spherical components — for example, s-type contamination (x²+y²+z²) in d- or f-shells. These
-components violate angular momentum purity and are unphysical in a spherical harmonic representation.
+Cartesian-to-spherical warning
+===============================
 
-You can eliminate this warning and enforce physically correct orbitals by enabling the `--cart2harm-projection` flag.
-This flag applies an orthogonal projection that removes all constraint-violating components, ensuring your orbitals are
-expressed strictly in pure spherical harmonics — as required CASINO code.
+You may see a warning during conversion:
 
-Without `--cart2harm-projection`, the code maps only the pure spherical components (e.g., 5 of 6 for d-shells), ignoring
-the rest like the s-type contaminant (x²+y²+z²) and implicitly assumes they are zero.
+    WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
 
-❗ Important note on energy: Even after projection, and especially without it, the total energy may not match the original
-Cartesian-basis energy because you’re removing unphysical (but energetically stabilizing) components without fully reconstructing
-the wavefunction in the pure spherical basis.
+ADF computes MOs in a Cartesian basis (6 d-functions, 10 f-functions).
+CASINO requires pure spherical harmonics (5 d, 7 f). The extra Cartesian
+components (e.g. the s-type contamination x²+y²+z² in d-shells) are
+unphysical in a spherical harmonic representation.
+
+Use `--cart2harm-projection` to remove these components via an orthogonal
+projection onto the pure spherical harmonic subspace. Without it, the
+contaminating components are silently dropped, which may slightly affect
+the total energy.
+
+
+Testing
+=======
+
+Reference output files for all example systems are included in `examples/`.
+To run the regression tests:
+
+```bash
+pip install pytest
+pytest tests/test_regression.py -v
+```
+
+Each test runs the full conversion pipeline on `examples/<system>/TAPE21.asc`
+and compares the result against the reference `stowfn.data`.
+
+
+Documentation
+=============
+
+Full documentation including mathematical background (cusp conditions,
+Cartesian-to-spherical transformation matrices) is available in `docs/`.
+To build locally:
+
+```bash
+pip install sphinx sphinx-rtd-theme
+cd docs && make html
+```
