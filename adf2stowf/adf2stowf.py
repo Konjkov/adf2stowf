@@ -388,7 +388,7 @@ class ADFToStoWF:
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
             first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:atom])
-            Ncore_harmbasfns = np.sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
+            Ncore_harmbasfns = sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
             core_coeff = np.zeros([Ncore_harmbasfns])
             ccor_per_shell = np.array_split(self.ccor_per_atomtype[at], np.cumsum((self.nrcset * self.nrcorb)[at, :]))[:-1]
             for shell in range(self.nrcorb[at, 0]):

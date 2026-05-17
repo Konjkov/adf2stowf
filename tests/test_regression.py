@@ -41,7 +41,7 @@ SYSTEMS = sorted(
 # H is an open-shell doublet; process_coefficients has a known matmul bug for
 # this case. Skip rather than xfail — it is a known limitation, not a regression.
 _SKIP = {'H'}
-_COEFF_MISMATCH = {'Kr', 'Xe'}    # reference stowfn.data predates current algorithm
+_COEFF_MISMATCH = {'Kr', 'Xe'}    # AO ordering mismatch within shells for heavy atoms (frozen core)
 
 
 def _convert(system: str) -> StoWfn:
@@ -134,7 +134,7 @@ def test_coefficients(system):
     if system in _SKIP:
         pytest.skip('Open-shell H: known matmul bug in process_coefficients')
     if system in _COEFF_MISMATCH:
-        pytest.xfail('Reference file predates current algorithm; needs regeneration')
+        pytest.xfail('AO ordering mismatch for heavy atoms with large frozen core — needs investigation')
     gen, ref = _convert(system), _ref(system)
     for sp in range(1 + int(gen.spin_unrestricted)):
         np.testing.assert_allclose(
