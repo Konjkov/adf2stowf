@@ -65,18 +65,6 @@ def _ref(system: str) -> StoWfn:
 # ── tests ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize('system', SYSTEMS)
-@pytest.mark.xfail(reason='Known converter bug: matmul dimension mismatch for open-shell H')
-def test_meta(system):
-    """Header metadata must match exactly."""
-    gen, ref = _convert(system), _ref(system)
-    assert gen.periodicity == ref.periodicity
-    assert gen.spin_unrestricted == ref.spin_unrestricted
-    assert (gen.num_molorbs == ref.num_molorbs).all()
-    assert gen.num_elec == ref.num_elec
-    assert abs(gen.nuclear_repulsion_energy - ref.nuclear_repulsion_energy) < 1e-12
-
-
-@pytest.mark.parametrize('system', SYSTEMS)
 def test_meta(system):
     """Header metadata must match exactly."""
     gen, ref = _convert(system), _ref(system)
