@@ -27,8 +27,19 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     'numpy>=1.24.4',
+    'scipy>=1.13.1',
     'matplotlib>=3.9.0',
 ]
+
+[project.optional-dependencies]
+dev = [
+    'pytest>=8.4.0',
+]
+doc = [
+    'sphinx>=9.0.0',
+    'sphinx-rtd-theme>=3.0.0',
+]
+
 [project.urls]
 repository = 'https://github.com/Konjkov/adf2stowf'
 
