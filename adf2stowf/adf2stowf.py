@@ -333,18 +333,22 @@ class ADFToStoWF:
                 if n_cart > n_harm:
                     constraint = self.cart2harm_map[st][n_harm:]
                     self.cart2harm_constraint[j - i : j - i + n_cart - n_harm, j : j + n_cart] = constraint
-                    violation = sum(np.linalg.norm(constraint @ self.molorb_cart_coeff[spin][:, j : j + n_cart].T) for spin in range(self.Nspins))
-                    if violation > 1e-5:
-                        print(f'WARNING: cartesian to spherical conversion for atom {atom}, shell type {st} violated by {violation:.8f}')
-                        current_order_r = self.valence_order_r_per_atomtype[at][shell] + 2
-                        current_zeta = self.valence_zeta_per_atomtype[at][shell]
-                        print(f'with r_order {current_order_r} and zeta: {current_zeta}')
+                    active_spins = [sp for sp in range(self.Nspins) if self.molorb_cart_coeff[sp].shape[0] > 0]
+                    if active_spins:
+                        violation = sum(np.linalg.norm(constraint @ self.molorb_cart_coeff[sp][:, j : j + n_cart].T) for sp in active_spins)
+                        if violation > 1e-5:
+                            print(f'WARNING: cartesian to spherical conversion for atom {atom}, shell type {st} violated by {violation:.8f}')
+                            current_order_r = self.valence_order_r_per_atomtype[at][shell] + 2
+                            current_zeta = self.valence_zeta_per_atomtype[at][shell]
+                            print(f'with r_order {current_order_r} and zeta: {current_zeta}')
                 i += n_harm
                 j += n_cart
         assert i == self.Nharmbasfns
         assert j == self.Nvalence_cartbasfn
 
         for sp in range(self.Nspins):
+            if self.molorb_cart_coeff[sp].shape[0] == 0:
+                continue
             violation = self.cart2harm_constraint @ self.molorb_cart_coeff[sp].T
             absviolations = np.linalg.norm(violation, axis=0)
             for m, err in enumerate(absviolations):
@@ -375,7 +379,10 @@ class ADFToStoWF:
                     if absviolation > 1e-10:
                         print(f'WARNING: Projection failed for spin {sp}, orb {m:2d}: {absviolation:.13f}')
 
-        self.valence_molorb_harm_coeff = [self.cart2harm_matrix @ self.molorb_cart_coeff[sp].T for sp in range(self.Nspins)]
+        self.valence_molorb_harm_coeff = [
+            self.cart2harm_matrix @ self.molorb_cart_coeff[sp].T if self.molorb_cart_coeff[sp].shape[0] > 0 else np.zeros((self.Nharmbasfns, 0))
+            for sp in range(self.Nspins)
+        ]
 
     def process_core_orbitals(self):
         self.nrcorb = self.Core['nrcorb'].reshape(self.Natomtypes, 4)
