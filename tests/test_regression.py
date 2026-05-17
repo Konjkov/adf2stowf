@@ -38,10 +38,6 @@ SYSTEMS = sorted(
     and (d / 'stowfn.data').exists()
 )
 
-# H is an open-shell doublet; process_coefficients has a known matmul bug for
-# this case. Skip rather than xfail — it is a known limitation, not a regression.
-_SKIP = {'H'}
-
 
 def _convert(system: str) -> StoWfn:
     """Run the converter in a temp dir and return the parsed StoWfn."""
@@ -72,8 +68,6 @@ def _ref(system: str) -> StoWfn:
 @pytest.mark.xfail(reason='Known converter bug: matmul dimension mismatch for open-shell H')
 def test_meta(system):
     """Header metadata must match exactly."""
-    if system not in _SKIP:
-        pytest.importorskip('never')  # don't xfail non-bug systems
     gen, ref = _convert(system), _ref(system)
     assert gen.periodicity == ref.periodicity
     assert gen.spin_unrestricted == ref.spin_unrestricted
@@ -85,8 +79,6 @@ def test_meta(system):
 @pytest.mark.parametrize('system', SYSTEMS)
 def test_meta(system):
     """Header metadata must match exactly."""
-    if system in _SKIP:
-        pytest.skip('Open-shell H: known matmul bug in process_coefficients')
     gen, ref = _convert(system), _ref(system)
     assert gen.periodicity == ref.periodicity
     assert gen.spin_unrestricted == ref.spin_unrestricted
@@ -98,8 +90,6 @@ def test_meta(system):
 @pytest.mark.parametrize('system', SYSTEMS)
 def test_geometry(system):
     """Atomic positions, numbers and valence charges must match."""
-    if system in _SKIP:
-        pytest.skip('Open-shell H: known matmul bug in process_coefficients')
     gen, ref = _convert(system), _ref(system)
     assert gen.num_atom == ref.num_atom
     np.testing.assert_array_equal(gen.atomnum, ref.atomnum)
@@ -110,8 +100,6 @@ def test_geometry(system):
 @pytest.mark.parametrize('system', SYSTEMS)
 def test_basis(system):
     """Basis set (shell types, radial orders, exponents, AO counts) must match."""
-    if system in _SKIP:
-        pytest.skip('Open-shell H: known matmul bug in process_coefficients')
     gen, ref = _convert(system), _ref(system)
     assert gen.num_shells == ref.num_shells
     assert gen.num_atorbs == ref.num_atorbs
@@ -127,8 +115,6 @@ def test_coefficients(system):
     Known exceptions:
     - H: crashes in process_coefficients (open-shell matmul bug)
     """
-    if system in _SKIP:
-        pytest.skip('Open-shell H: known matmul bug in process_coefficients')
     gen, ref = _convert(system), _ref(system)
     for sp in range(1 + int(gen.spin_unrestricted)):
         assert gen.coeff[sp] == pytest.approx(ref.coeff[sp])
