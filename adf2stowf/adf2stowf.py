@@ -124,7 +124,25 @@ class ADFToStoWF:
         return Nharmpoly, Ncartpoly, harm2cart, cart2harm
 
     def process_valence_basis(self):
-        """."""
+        """Parse the valence STO basis from the TAPE21 Basis section.
+
+        Reads shell counts, angular momenta, principal quantum numbers, zeta
+        exponents, and Cartesian normalisation factors for all valence shells.
+        Derives per-atom-type and per-centre views of every quantity, as well
+        as the shell-type codes and radial prefactor orders (order_r = n - l - 1)
+        required by CASINO.
+
+        Sets attributes (among others):
+            nbset, nbos                        – total shell / Cartesian-function counts
+            nbaspt, nbptr                      – 0-based shell / Cartesian-fn pointers per atom type
+            nqbas, lqbas, alfbas               – raw TAPE21 arrays (n, l, ζ)
+            valence_shelltype                  – CASINO shelltype code per shell (s=1, p=3, d=4, f=5)
+            valence_order_r, valence_zeta      – radial prefactor exponent and ζ per shell
+            valence_cartnorm                   – ADF Cartesian normalisation per basis function
+            Nvalence_shells_per_atomtype/centre – shell counts for layout bookkeeping
+            Nvalence_cartbasfn_per_atomtype/centre – Cartesian function counts
+            Nvalence_harmbasfns_per_atomtype/centre – spherical harmonic function counts
+        """
         self.nbset = self.Basis['nbset'][0]
         self.nbos = self.Basis['nbos'][0]
         self.nbaspt = self.Basis['nbaspt'] - 1
@@ -164,7 +182,26 @@ class ADFToStoWF:
         self.valence_cartnorm_per_atomtype = [self.valence_cartnorm[self.nbptr[a] : self.nbptr[a + 1]] for a in range(self.Natomtypes)]
 
     def process_core_basis(self):
-        """."""
+        """Parse the frozen-core STO basis from the TAPE21 Core section.
+
+        Reads shell counts, angular momenta, principal quantum numbers, zeta
+        exponents, and Cartesian normalisation factors for all frozen-core shells.
+        Constructs per-atom-type and per-centre views analogous to those built
+        by ``process_valence_basis``.
+
+        Only s-type (shelltype=1) and p-type (shelltype=3) core shells are
+        supported; d- and f-type core shells raise ``ValueError``.
+
+        Sets attributes (among others):
+            ncset                              – total number of core STO shells
+            ncorpt                             – 0-based shell pointer per atom type
+            nqcor, lqcor, alfcor, cornrm       – raw TAPE21 arrays (n, l, ζ, norm)
+            nrcset                             – shape (Natomtypes, 4): shell counts per l
+            core_shelltype                     – CASINO shelltype code per core shell
+            core_order_r, core_zeta            – radial prefactor exponent and ζ per core shell
+            core_cartnorm_per_atomtype         – Cartesian normalisation per atom type (flat)
+            Ncore_shells_per_atomtype/centre   – core shell counts for layout bookkeeping
+        """
         self.ncset = self.Core['ncset'][0]
         self.ncorpt = self.Core['ncorpt'] - 1
         assert self.ncorpt[0] == 0
@@ -208,7 +245,22 @@ class ADFToStoWF:
                 self.core_cartnorm_per_atomtype += [np.zeros([0])]
 
     def process_shells(self):
-        """."""
+        """Merge core and valence shell data into per-centre arrays.
+
+        Concatenates the per-atom-type core and valence arrays (shell type,
+        radial-prefactor order, and zeta exponent) into per-centre lists that
+        cover *all* shells on each atom in the order CASINO expects: core
+        shells first, followed by valence shells.
+
+        Requires that both ``process_core_basis`` and ``process_valence_basis``
+        have already been called.
+
+        Sets attributes:
+            Nshells_per_centre     – total number of shells on each atom
+            shelltype_per_centre   – list of CASINO shelltype arrays, one per atom
+            order_r_per_centre     – list of radial-prefactor exponent arrays, one per atom
+            zeta_per_centre        – list of ζ-exponent arrays, one per atom
+        """
         self.Nshells_per_centre = self.Nvalence_shells_per_centre + self.Ncore_shells_per_centre
         self.shelltype_per_centre = [
             np.concatenate([self.core_shelltype_per_atomtype[at], self.valence_shelltype_per_atomtype[at]]) for at in self.atyp_idx
@@ -223,7 +275,26 @@ class ADFToStoWF:
             assert len(self.zeta_per_centre[c]) == self.Nshells_per_centre[c]
 
     def select_coeff(self, sp):
-        """."""
+        """Extract and sort molecular-orbital coefficients for one spin channel.
+
+        Iterates over all ADF symmetry irreps and collects Cartesian-basis MO
+        coefficient vectors, orbital eigenvalues, and occupation numbers for
+        spin channel ``sp`` (0 = alpha / restricted, 1 = beta).
+
+        Handles fractional occupations (e.g. from Fermi smearing) by carrying
+        over residual partial occupation to the next orbital with the same
+        eigenvalue.  A warning is printed for any unresolved leftover occupation
+        after all irreps have been processed.
+
+        When ``self.only_occupied`` is True, only fully occupied MOs
+        (occupation ≥ 2/Nspins) are returned; otherwise all MOs are returned.
+
+        Returns:
+            molorb_cart_coeff (ndarray, shape (Nmo, Ncart)):
+                Cartesian-basis coefficient matrix sorted by orbital eigenvalue,
+                where Nmo is the number of selected MOs and Ncart is the total
+                number of Cartesian AO basis functions.
+        """
         X = ['A', 'B'][sp]
         molorb_cart_coeff = []
         molorb_occupation = []
@@ -309,7 +380,29 @@ class ADFToStoWF:
         return molorb_cart_coeff[order]
 
     def process_coefficients(self):
-        """."""
+        """Transform MO coefficients from the Cartesian AO basis to spherical harmonics.
+
+        Builds the block-diagonal ``cart2harm_matrix`` (shape Nharmbasfns × Ncart)
+        and the complementary ``cart2harm_constraint`` matrix (shape
+        (Ncart - Nharmbasfns) × Ncart) that captures non-physical Cartesian
+        components (s-contamination in d-shells, p-contamination in f-shells).
+
+        A warning is printed for each shell or orbital where the constraint
+        violation norm exceeds 1e-5, indicating that the Cartesian MO expansion
+        contains physically spurious components that will be lost in the
+        projection to spherical harmonics unless
+        ``extract_contamination_shells`` is called afterwards.
+
+        Sets attributes:
+            Nharmbasfns               – total number of spherical-harmonic basis functions
+            Nvalence_cartbasfn        – total number of Cartesian valence basis functions
+            molorb_cart_coeff         – list (per spin) of Cartesian MO coefficient matrices
+            Nvalence_molorbs          – array of MO counts per spin channel
+            cart2harm_matrix          – Cartesian → spherical transformation (block-diagonal)
+            cart2harm_constraint      – rows of cart2harm_map beyond n_harm (contamination extractor)
+            valence_molorb_harm_coeff – list (per spin) of MO coefficients in spherical-harmonic basis,
+                                        shape (Nharmbasfns, Nmo) per spin
+        """
         self.Nharmbasfns_per_centre = [self.Nharmpoly_per_shelltype[st].sum() for st in self.shelltype_per_centre]
         self.Nharmbasfns = np.sum(self.Nharmbasfns_per_centre)
         self.Nvalence_cartbasfn = np.sum(self.Nvalence_cartbasfn_per_centre)
@@ -434,7 +527,31 @@ class ADFToStoWF:
                 self.valence_molorb_harm_coeff[sp] = np.concatenate([self.valence_molorb_harm_coeff[sp], extra_block], axis=0)
 
     def process_core_orbitals(self):
-        """."""
+        """Reconstruct frozen-core MO coefficient matrix in the spherical-harmonic basis.
+
+        ADF stores core MO coefficients (``ccor``) per atom type and per angular
+        momentum shell, in a compact interleaved format.  This method unpacks
+        them into a full ``core_molorb_coeff`` matrix of shape
+        (Nharmbasfns, Ncore_molorbs), placing each core orbital's coefficients
+        at the rows corresponding to its host atom.
+
+        Core orbitals are produced for each atom of that type by iterating over
+        ``atyp_idx``.  For each angular-momentum channel (s, p, d, f) the
+        number of MOs is taken from ``nrcorb``, and for each MO the coefficients
+        are placed at the appropriate spherical-harmonic rows:
+          - s-type: 1 coefficient per shell
+          - p-type: 3 coefficients (one per Cartesian component, interleaved)
+          - d-type: 5 coefficients (not yet supported — raises NotImplementedError)
+          - f-type: 7 coefficients (not yet supported — raises NotImplementedError)
+
+        Sets attributes:
+            nrcorb                     – shape (Natomtypes, 4): core MO counts per l per atom type
+            ccor                       – raw flattened core MO coefficient array from TAPE21
+            Ncoremolorbs_per_atomtype  – total number of core MOs per atom type (counting harmonics)
+            Ncoremolorbs_per_centre    – core MO count mapped to each atom
+            Ncore_molorbs              – grand total of core MOs across all atoms
+            core_molorb_coeff          – full coefficient matrix (Nharmbasfns × Ncore_molorbs)
+        """
         self.nrcorb = self.Core['nrcorb'].reshape(self.Natomtypes, 4)
         self.ccor = self.Core['ccor']
         self.Nccor_per_atomtype = (self.nrcset * self.nrcorb).sum(axis=1)
@@ -486,7 +603,27 @@ class ADFToStoWF:
         assert molorb == self.Ncore_molorbs
 
     def finalize_coefficients(self):
-        """."""
+        """Assemble the full MO coefficient matrix and normalisation vector.
+
+        Concatenates the frozen-core and valence MO coefficient blocks along
+        the orbital (column) axis for each spin channel, producing a single
+        ``coeff`` matrix of shape (Nharmbasfns, Ncore_molorbs + Nvalence_molorbs).
+
+        When ``extract_contamination_shells`` has been called, the valence
+        block may have extra rows (contamination-shell coefficients appended
+        below the spherical-harmonic rows).  Any missing rows are zero-padded
+        to Nharmbasfns so the concatenation is always well-formed.
+
+        Also builds ``norm_per_harmbasfn``, the flat array of ADF Cartesian
+        normalisation factors (one entry per spherical-harmonic basis function
+        across all centres) used later by ``StoWfn.check_and_normalize``.
+
+        Sets attributes:
+            Nmolorbs            – array of total MO counts per spin (core + valence)
+            coeff               – list (per spin) of full coefficient matrices
+            norm_per_centre     – list (per atom) of concatenated core+valence norms
+            norm_per_harmbasfn  – flat norm array over all basis functions
+        """
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
         # core_molorb_coeff has shape (Nharmbasfns, Ncore_molorbs) — allocated in process_core_orbitals
         # valence_molorb_harm_coeff may have fewer rows when exact_cart2harm=False (only spherical part)
@@ -508,7 +645,22 @@ class ADFToStoWF:
         self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
     def setup_stowfn(self):
-        """."""
+        """Populate a StoWfn object with geometry, basis, and MO data.
+
+        Transfers all data assembled by the previous processing steps into a
+        fresh ``stowfn.StoWfn`` instance (``self.sto``), ready for cusp
+        correction and final file output.
+
+        Also computes the nuclear repulsion energy from pairwise interatomic
+        distances (averaged over atoms as stored in TAPE21) and sets the
+        total electron count to include both valence and core electrons.
+
+        After population, calls ``self.sto.check_and_normalize()`` to verify
+        consistency and apply any remaining normalisation.
+
+        Sets attribute:
+            sto – fully populated StoWfn object
+        """
         self.sto = stowfn.StoWfn()
         self.sto.num_atom = self.Natoms
         self.sto.title = self.General['title'][0]
@@ -545,7 +697,31 @@ class ADFToStoWF:
         self.sto.check_and_normalize()
 
     def apply_cusp_correction(self):
-        """."""
+        """Apply or check the nuclear cusp condition on each molecular orbital.
+
+        For every MO and each spin channel, evaluates the cusp constraint
+        (``sto.cusp_constraint_matrix() @ coeff[:, i]``).  If the constraint
+        is violated beyond 1e-9, the orbital is flagged and — depending on
+        ``self.cusp_method``:
+
+        * ``'project'``: projects out the cusp-violating component via a
+          null-space projection matrix (``sto.cusp_projection_matrix()``).
+        * ``'enforce'``: applies a linear enforcing matrix
+          (``sto.cusp_enforcing_matrix()``) that modifies the s-type
+          coefficients at each nucleus to satisfy the cusp exactly.
+        * ``'none'``:  no modification; violation is only recorded.
+
+        After correction, asserts that all constraint violations are < 1e-8.
+
+        When ``self.do_plot_cusps`` is True, evaluates the wavefunction values
+        and Laplacians along a z-axis line through each atom both before and
+        after correction, storing them in ``val_pre / val_post`` and
+        ``lap_pre / lap_post`` for later use by ``plot_cusps()``.
+
+        Finally, transposes ``self.coeff`` into ``sto.coeff`` (shape
+        (Nmo, Nharmbasfns)) and calls ``sto.check_and_normalize()`` and
+        ``sto.writefile('stowfn.data')``.
+        """
         cusp_fixed_atorbs = self.sto.cusp_fixed_atorbs()
         cusp_constraint = self.sto.cusp_constraint_matrix()
         cusp_projection = self.sto.cusp_projection_matrix()
@@ -610,7 +786,24 @@ class ADFToStoWF:
         self.sto.writefile('stowfn.data')
 
     def plot_cusps(self):
-        """."""
+        """Plot wavefunction values and local energies near each nucleus before and after cusp correction.
+
+        Only runs when ``self.do_plot_cusps`` is True and
+        ``apply_cusp_correction`` has stored the pre/post evaluation arrays.
+
+        For each atom creates a 2-row subplot:
+          * Top row: MO values ψ(z) along the z-axis through the nucleus,
+            dashed = before correction, solid = after correction.
+          * Bottom row: local kinetic energy E_loc = −∇²ψ/(2ψ) − Z/|r|,
+            which should be flat at the nucleus after successful correction.
+
+        Only orbitals that were flagged as cusp-violating (``self.fixed``) are
+        plotted.  The y-axis of the local-energy panel is clipped to 1.5× the
+        range of the corrected values to suppress the Coulomb singularity at
+        r=0.
+
+        Saves the figure to ``cusp_constraint.svg`` in the current directory.
+        """
         if not self.do_plot_cusps:
             return
         import matplotlib.pyplot as plt
