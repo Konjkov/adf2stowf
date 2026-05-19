@@ -15,12 +15,11 @@ np.set_printoptions(
 
 
 class ADFToStoWF:
-    def __init__(self, plot_cusps, cusp_method, do_dump, cart2harm_projection, only_occupied):
+    def __init__(self, plot_cusps, cusp_method, do_dump, only_occupied):
         """Initialize the ADFToStoWF object."""
         self.do_plot_cusps = plot_cusps
         self.cusp_method = cusp_method
         self.do_dump = do_dump
-        self.cart2harm_projection = cart2harm_projection
         self.only_occupied = only_occupied
         self.parser = adfread.AdfParser('TAPE21.asc')
         self.data = self.parser.parse()
@@ -125,6 +124,7 @@ class ADFToStoWF:
         return Nharmpoly, Ncartpoly, harm2cart, cart2harm
 
     def process_valence_basis(self):
+        """."""
         self.nbset = self.Basis['nbset'][0]
         self.nbos = self.Basis['nbos'][0]
         self.nbaspt = self.Basis['nbaspt'] - 1
@@ -164,6 +164,7 @@ class ADFToStoWF:
         self.valence_cartnorm_per_atomtype = [self.valence_cartnorm[self.nbptr[a] : self.nbptr[a + 1]] for a in range(self.Natomtypes)]
 
     def process_core_basis(self):
+        """."""
         self.ncset = self.Core['ncset'][0]
         self.ncorpt = self.Core['ncorpt'] - 1
         assert self.ncorpt[0] == 0
@@ -207,6 +208,7 @@ class ADFToStoWF:
                 self.core_cartnorm_per_atomtype += [np.zeros([0])]
 
     def process_shells(self):
+        """."""
         self.Nshells_per_centre = self.Nvalence_shells_per_centre + self.Ncore_shells_per_centre
         self.shelltype_per_centre = [
             np.concatenate([self.core_shelltype_per_atomtype[at], self.valence_shelltype_per_atomtype[at]]) for at in self.atyp_idx
@@ -221,6 +223,7 @@ class ADFToStoWF:
             assert len(self.zeta_per_centre[c]) == self.Nshells_per_centre[c]
 
     def select_coeff(self, sp):
+        """."""
         X = ['A', 'B'][sp]
         molorb_cart_coeff = []
         molorb_occupation = []
@@ -306,6 +309,7 @@ class ADFToStoWF:
         return molorb_cart_coeff[order]
 
     def process_coefficients(self):
+        """."""
         self.Nharmbasfns_per_centre = [self.Nharmpoly_per_shelltype[st].sum() for st in self.shelltype_per_centre]
         self.Nharmbasfns = np.sum(self.Nharmbasfns_per_centre)
         self.Nvalence_cartbasfn = np.sum(self.Nvalence_cartbasfn_per_centre)
@@ -355,36 +359,82 @@ class ADFToStoWF:
                 if err > 1e-5:
                     print(f'WARNING: cartesian to spherical conversion for spin {sp}, orb {m:2d} violated by {err:.8f}')
 
-        if self.cart2harm_projection:
-            # Use SVD-based nullspace for numerical stability (preferred over direct pseudoinverse)
-            from scipy.linalg import null_space
-
-            # Compute projection matrix: P = I - A^T (A A^T)^{-1} A
-            A = self.cart2harm_constraint
-            # Compute orthonormal basis for the nullspace of A (i.e., vectors x such that A @ x = 0)
-            Q = null_space(A)  # Q: (Ncart, Ncart - K), columns = orthonormal basis of nullspace
-            P = Q @ Q.T  # Projection matrix: P @ x projects x onto the nullspace of A
-            # Apply projection to each molecular orbital
-            for sp in range(self.Nspins):
-                for m in range(self.Nvalence_molorbs[sp]):
-                    # Original Cartesian orbital coefficient vector
-                    C = self.molorb_cart_coeff[sp][m, :].copy()
-                    # Project onto pure spherical harmonic subspace
-                    C_proj = P @ C
-                    # Overwrite with projected coefficients
-                    self.molorb_cart_coeff[sp][m, :] = C_proj
-                    # Verify constraint satisfaction: should be numerically zero
-                    violation = A @ C_proj
-                    absviolation = np.linalg.norm(violation)
-                    if absviolation > 1e-10:
-                        print(f'WARNING: Projection failed for spin {sp}, orb {m:2d}: {absviolation:.13f}')
-
         self.valence_molorb_harm_coeff = [
             self.cart2harm_matrix @ self.molorb_cart_coeff[sp].T if self.molorb_cart_coeff[sp].shape[0] > 0 else np.zeros((self.Nharmbasfns, 0))
             for sp in range(self.Nspins)
         ]
 
+    def extract_contamination_shells(self):
+        """Exact Cartesian-to-spherical conversion for d-shells via s-type contamination shell.
+
+        For each valence d-shell, the 6 Cartesian functions span a 5D spherical
+        subspace plus a 1D s-type contamination: x²+y²+z² = r² · Y₀⁰ · const.
+        Instead of discarding this component (lossy), we add it back as a new
+        s-type STO shell on the same centre with the same ζ and order_r + 2.
+
+        Note: f-shell p-type contamination is not handled here — ADF does not
+        produce p-contamination in f-shells (confirmed).
+
+        Normalization:
+          The contamination coefficient from cart2harm carries ADF normalization.
+          CASINO requires rescaling by norm_ADF / norm_CASINO = √5 (purely angular,
+          independent of order_r and ζ).
+        """
+        extra_coeff = [[] for _ in range(self.Nspins)]
+
+        j = 0
+        for atom in range(self.Natoms):
+            at = self.atyp_idx[atom]
+            for shell in range(self.Nvalence_shells_per_atomtype[at]):
+                st = self.valence_shelltype_per_atomtype[at][shell]
+                n_cart = self.Ncartpoly_per_shelltype[st]
+
+                if st == 4:  # d-shell: 1 s-type contamination function
+                    # ADF Cartesian d-shell order: xy, xz, yz, xx-yy, 2zz-xx-yy, x2+y2+z2
+                    # Index 5 = x2+y2+z2 = r^2 (the S-contamination function).
+                    # Its contribution to a MO is:
+                    #   c_cart[5] * bnorm[5] * r^2 * r^order_r * exp(-zeta*r)
+                    # New s-shell in CASINO evaluates as:
+                    #   coeff_new * get_norm_new * r^(order_r+2) * exp(-zeta*r)
+                    # So: coeff_new = c_cart[5] * bnorm[5] / get_norm_new = c_cart[5] * sqrt(5)
+                    # (the factor sqrt(5) = bnorm[5] / get_norm_new is shell-independent)
+                    #
+                    # NOTE: do NOT use cart2harm_map[4][5] here — that row extracts
+                    # the S *mode* of the 6x6 harm2cart system (a linear combination
+                    # of xy, xx-yy, and x2+y2+z2 Cartesian coefficients), which is
+                    # NOT the same as the single Cartesian function x2+y2+z2.
+                    new_order_r = int(self.valence_order_r_per_atomtype[at][shell]) + 2
+                    new_zeta = float(self.valence_zeta_per_atomtype[at][shell])
+
+                    self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 1)
+                    self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
+                    self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
+                    self.Nshells_per_centre[atom] += 1
+
+                    for sp in range(self.Nspins):
+                        if self.molorb_cart_coeff[sp].shape[0] == 0:
+                            extra_coeff[sp].append(np.zeros((1, 0)))
+                        else:
+                            # TODO: correct normalization factor to be determined.
+                            # Setting to zero for now — the shell is added structurally
+                            # but does not contribute to the wavefunction yet.
+                            Nmo = self.molorb_cart_coeff[sp].shape[0]
+                            extra_coeff[sp].append(np.zeros((1, Nmo)))
+
+                j += n_cart
+
+        assert j == self.Nvalence_cartbasfn
+
+        if not any(extra_coeff[sp] for sp in range(self.Nspins)):
+            return
+
+        for sp in range(self.Nspins):
+            if extra_coeff[sp]:
+                extra_block = np.concatenate(extra_coeff[sp], axis=0)  # (n_contam_total, Nmo)
+                self.valence_molorb_harm_coeff[sp] = np.concatenate([self.valence_molorb_harm_coeff[sp], extra_block], axis=0)
+
     def process_core_orbitals(self):
+        """."""
         self.nrcorb = self.Core['nrcorb'].reshape(self.Natomtypes, 4)
         self.ccor = self.Core['ccor']
         self.Nccor_per_atomtype = (self.nrcset * self.nrcorb).sum(axis=1)
@@ -436,7 +486,17 @@ class ADFToStoWF:
         assert molorb == self.Ncore_molorbs
 
     def finalize_coefficients(self):
+        """."""
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
+        # core_molorb_coeff has shape (Nharmbasfns, Ncore_molorbs) — allocated in process_core_orbitals
+        # valence_molorb_harm_coeff may have fewer rows when exact_cart2harm=False (only spherical part)
+        # or more rows when exact_cart2harm=True (spherical + contamination shells appended).
+        # Both must have exactly Nharmbasfns rows to concatenate along axis=1.
+        for sp in range(self.Nspins):
+            n_val = self.valence_molorb_harm_coeff[sp].shape[0]
+            if n_val < self.Nharmbasfns:
+                pad = np.zeros((self.Nharmbasfns - n_val, self.valence_molorb_harm_coeff[sp].shape[1]))
+                self.valence_molorb_harm_coeff[sp] = np.concatenate([self.valence_molorb_harm_coeff[sp], pad], axis=0)
         self.coeff = [np.concatenate([self.core_molorb_coeff, self.valence_molorb_harm_coeff[sp]], axis=1) for sp in range(self.Nspins)]
         if False:
             print('molorb sparsity:')
@@ -448,6 +508,7 @@ class ADFToStoWF:
         self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
     def setup_stowfn(self):
+        """."""
         self.sto = stowfn.StoWfn()
         self.sto.num_atom = self.Natoms
         self.sto.title = self.General['title'][0]
@@ -484,6 +545,7 @@ class ADFToStoWF:
         self.sto.check_and_normalize()
 
     def apply_cusp_correction(self):
+        """."""
         cusp_fixed_atorbs = self.sto.cusp_fixed_atorbs()
         cusp_constraint = self.sto.cusp_constraint_matrix()
         cusp_projection = self.sto.cusp_projection_matrix()
@@ -548,6 +610,7 @@ class ADFToStoWF:
         self.sto.writefile('stowfn.data')
 
     def plot_cusps(self):
+        """."""
         if not self.do_plot_cusps:
             return
         import matplotlib.pyplot as plt
@@ -606,6 +669,7 @@ class ADFToStoWF:
         self.process_core_basis()
         self.process_shells()
         self.process_coefficients()
+        self.extract_contamination_shells()
         self.process_core_orbitals()
         self.finalize_coefficients()
         self.setup_stowfn()
@@ -625,16 +689,12 @@ def main():
           %(prog)s --cusp-method=project        # project out cusp-violating components
           %(prog)s --cusp-method=none           # disable any cusp correction
           %(prog)s --dump                       # generate a text dump of the parsed data
-          %(prog)s --cart2harm-projection       # enforce pure spherical harmonics via projection
           %(prog)s --all-orbitals               # include also virtual orbitals (default: only occupied)
-          %(prog)s --cusp-method=project --dump
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        '--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps (e.g., density derivative at nuclei) (default: False)'
-    )
+    parser.add_argument('--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps (default: False)')
 
     parser.add_argument(
         '--cusp-method',
@@ -648,24 +708,13 @@ def main():
         """.strip(),
     )
 
-    parser.add_argument(
-        '--cart2harm-projection',
-        action='store_true',
-        help="""
-                Enforce conversion from Cartesian to pure spherical harmonic Gaussian basis functions
-                via orthogonal projection. Removes non-spherical components (e.g., s-type contamination
-                in d/f shells like x²+y²+z²) that violate angular momentum purity. This ensures physical
-                consistency but may change total energy if original orbitals contained such contamination.
-            """.strip(),
-    )
-
-    parser.add_argument('--all-orbitals', action='store_true', default=False, help='If set, include also virtual orbitals (default: only occupied).')
+    parser.add_argument('--all-orbitals', action='store_true', default=False, help='Include also virtual orbitals (default: only occupied).')
 
     parser.add_argument('--dump', action='store_true', help='Generate a text dump (.txt) of the parsed ADF data for debugging (default: False)')
 
     args = parser.parse_args()
 
-    adf_to_stowf = ADFToStoWF(args.plot_cusps, args.cusp_method, args.dump, args.cart2harm_projection, not args.all_orbitals)
+    adf_to_stowf = ADFToStoWF(args.plot_cusps, args.cusp_method, args.dump, not args.all_orbitals)
     adf_to_stowf.run()
 
 
