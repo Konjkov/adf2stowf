@@ -405,6 +405,9 @@ class ADFToStoWF:
         """
         self.Nharmbasfns_per_centre = [self.Nharmpoly_per_shelltype[st].sum() for st in self.shelltype_per_centre]
         self.Nharmbasfns = np.sum(self.Nharmbasfns_per_centre)
+        # Preserved before extract_contamination_shells extends Nharmbasfns_per_centre.
+        # process_core_orbitals uses this to compute first_harmbasfn correctly.
+        self.Nharmbasfns_per_centre_orig = list(self.Nharmbasfns_per_centre)
         self.Nvalence_cartbasfn = np.sum(self.Nvalence_cartbasfn_per_centre)
         assert np.all(
             self.Nvalence_cartbasfn_per_centre == np.array([self.Ncartpoly_per_shelltype[st].sum() for st in self.valence_shelltype_per_centre])
@@ -458,22 +461,37 @@ class ADFToStoWF:
         ]
 
     def extract_contamination_shells(self):
-        """Exact Cartesian-to-spherical conversion for d-shells via s-type contamination shell.
+        """Add extra STO shells to capture Cartesian contamination components exactly.
 
-        For each valence d-shell, the 6 Cartesian functions span a 5D spherical
-        subspace plus a 1D s-type contamination: x²+y²+z² = r² · Y₀⁰ · const.
-        Instead of discarding this component (lossy), we add it back as a new
-        s-type STO shell on the same centre with the same ζ and order_r + 2.
+        Cartesian d- and f-shells contain non-physical components beyond the pure
+        spherical-harmonic subspace.  Rather than discarding these components
+        (which would make the cart→sph transformation lossy), a new STO shell of
+        the appropriate lower angular momentum is added to the same centre with
+        the same ζ and ``order_r + 2``:
 
-        Note: f-shell p-type contamination is not handled here — ADF does not
-        produce p-contamination in f-shells (confirmed).
+        **D-shell** (shelltype=4, 6 Cartesian → 5 spherical + 1 contamination):
+          The 6th Cartesian function is x²+y²+z² = r²·Y₀⁰·const, which has s-type
+          angular symmetry but radial factor r^(order_r+2).  One new **s-shell**
+          (shelltype=1) is added per d-shell, contributing **1 new AO row**.
 
-        Normalization:
-          The contamination coefficient from cart2harm carries ADF normalization.
-          CASINO requires rescaling by norm_ADF / norm_CASINO = √5 (purely angular,
-          independent of order_r and ζ).
+        **F-shell** (shelltype=5, 10 Cartesian → 7 spherical + 3 contamination):
+          The 3 contamination functions are {x, y, z}·r² = p-type·r², i.e. they
+          have p-type angular symmetry with radial factor r^(order_r+2).  One new
+          **p-shell** (shelltype=3) is added per f-shell, contributing **3 new AO
+          rows** (px, py, pz).
+
+        Each new shell is registered in the per-centre geometry arrays
+        (shelltype, order_r, zeta, shell count).  AO coefficients are left as zero
+        here; they will be filled in a later step once normalization is established.
+
+        After adding all extra shells, ``Nharmbasfns`` and
+        ``Nharmbasfns_per_centre`` are updated, and both ``valence_molorb_harm_coeff``
+        and ``core_molorb_coeff`` are extended with matching zero rows so that all
+        coefficient matrices remain consistent with the new basis size.
         """
-        extra_coeff = [[] for _ in range(self.Nspins)]
+        # Track how many new AO rows are added per atom (for Nharmbasfns bookkeeping).
+        # Each new s-shell adds 1 AO; each new p-shell adds 3 AOs.
+        Nnew_ao_per_atom = np.zeros(self.Natoms, dtype=int)
 
         j = 0
         for atom in range(self.Natoms):
@@ -481,50 +499,77 @@ class ADFToStoWF:
             for shell in range(self.Nvalence_shells_per_atomtype[at]):
                 st = self.valence_shelltype_per_atomtype[at][shell]
                 n_cart = self.Ncartpoly_per_shelltype[st]
+                new_order_r = int(self.valence_order_r_per_atomtype[at][shell]) + 2
+                new_zeta = float(self.valence_zeta_per_atomtype[at][shell])
 
-                if st == 4:  # d-shell: 1 s-type contamination function
-                    # ADF Cartesian d-shell order: xy, xz, yz, xx-yy, 2zz-xx-yy, x2+y2+z2
-                    # Index 5 = x2+y2+z2 = r^2 (the S-contamination function).
-                    # Its contribution to a MO is:
-                    #   c_cart[5] * bnorm[5] * r^2 * r^order_r * exp(-zeta*r)
-                    # New s-shell in CASINO evaluates as:
-                    #   coeff_new * get_norm_new * r^(order_r+2) * exp(-zeta*r)
-                    # So: coeff_new = c_cart[5] * bnorm[5] / get_norm_new = c_cart[5] * sqrt(5)
-                    # (the factor sqrt(5) = bnorm[5] / get_norm_new is shell-independent)
-                    #
-                    # NOTE: do NOT use cart2harm_map[4][5] here — that row extracts
-                    # the S *mode* of the 6x6 harm2cart system (a linear combination
-                    # of xy, xx-yy, and x2+y2+z2 Cartesian coefficients), which is
-                    # NOT the same as the single Cartesian function x2+y2+z2.
-                    new_order_r = int(self.valence_order_r_per_atomtype[at][shell]) + 2
-                    new_zeta = float(self.valence_zeta_per_atomtype[at][shell])
-
+                if st == 4:  # d-shell: 1 s-type contamination (x²+y²+z² = r²·s)
+                    # The 6th Cartesian d-function x²+y²+z² has s-type angular symmetry
+                    # and radial factor r^(order_r+2).  Represent it as a new s-shell.
+                    # AO coefficients will be filled in a subsequent step; for now zero.
                     self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 1)
                     self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
                     self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
                     self.Nshells_per_centre[atom] += 1
+                    Nnew_ao_per_atom[atom] += 1  # 1 new s-AO
 
-                    for sp in range(self.Nspins):
-                        if self.molorb_cart_coeff[sp].shape[0] == 0:
-                            extra_coeff[sp].append(np.zeros((1, 0)))
-                        else:
-                            # TODO: correct normalization factor to be determined.
-                            # Setting to zero for now — the shell is added structurally
-                            # but does not contribute to the wavefunction yet.
-                            Nmo = self.molorb_cart_coeff[sp].shape[0]
-                            extra_coeff[sp].append(np.zeros((1, Nmo)))
+                elif st == 5:  # f-shell: 3 p-type contaminations ({x,y,z}·r²)
+                    # The 3 contamination modes are p_x·r², p_y·r², p_z·r²:
+                    # they share the same ζ and order_r+2 as the parent f-shell
+                    # and together form one p-shell (shelltype=3).
+                    # AO coefficients will be filled in a subsequent step; for now zero.
+                    self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 3)
+                    self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
+                    self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
+                    self.Nshells_per_centre[atom] += 1
+                    Nnew_ao_per_atom[atom] += 3  # 3 new p-AOs (px, py, pz)
 
                 j += n_cart
 
         assert j == self.Nvalence_cartbasfn
 
-        if not any(extra_coeff[sp] for sp in range(self.Nspins)):
+        Nnew_ao_total = int(Nnew_ao_per_atom.sum())
+        if Nnew_ao_total == 0:
             return
 
+        # Update Nharmbasfns_per_centre and Nharmbasfns to include the new AO rows.
+        self.Nharmbasfns_per_centre = [self.Nharmbasfns_per_centre[atom] + Nnew_ao_per_atom[atom] for atom in range(self.Natoms)]
+        self.Nharmbasfns += Nnew_ao_total
+
+        # Insert zero rows for the new AOs at the correct position in the coefficient
+        # matrix.  CASINO reads AOs atom by atom in shell order, so the new shells on
+        # atom k must appear immediately after the existing AOs of atom k — not at the
+        # end of the entire matrix.
+        #
+        # Original row layout (132 rows for O3 example):
+        #   [0:44]   = atom 0 orig AOs
+        #   [44:88]  = atom 1 orig AOs
+        #   [88:132] = atom 2 orig AOs
+        #
+        # Required layout after insertion (156 rows):
+        #   [0:52]    = atom 0 (44 orig + 8 new)
+        #   [52:104]  = atom 1 (44 orig + 8 new)
+        #   [104:156] = atom 2 (44 orig + 8 new)
+        #
+        # We process atoms from last to first so that insertion points in the
+        # original matrix are not shifted by earlier insertions.
         for sp in range(self.Nspins):
-            if extra_coeff[sp]:
-                extra_block = np.concatenate(extra_coeff[sp], axis=0)  # (n_contam_total, Nmo)
-                self.valence_molorb_harm_coeff[sp] = np.concatenate([self.valence_molorb_harm_coeff[sp], extra_block], axis=0)
+            mat = self.valence_molorb_harm_coeff[sp]  # (Nharmbasfns_old, Nmo)
+            Nmo = mat.shape[1]
+            # Insertion point in the OLD matrix: end of atom k's original block.
+            insert_at = np.cumsum(self.Nharmbasfns_per_centre_orig)  # e.g. [44, 88, 132]
+            for atom in range(self.Natoms - 1, -1, -1):
+                if Nnew_ao_per_atom[atom] == 0:
+                    continue
+                pos = int(insert_at[atom])
+                zeros = np.zeros((Nnew_ao_per_atom[atom], Nmo))
+                mat = np.concatenate([mat[:pos], zeros, mat[pos:]], axis=0)
+            self.valence_molorb_harm_coeff[sp] = mat
+
+        # Note: core_molorb_coeff does not exist yet at this point in the pipeline
+        # (process_core_orbitals runs after this method).  process_core_orbitals
+        # allocates core_molorb_coeff with shape (Nharmbasfns, Ncore_molorbs), and
+        # Nharmbasfns has already been updated above, so the extra rows for the new
+        # AOs will be zero-initialised automatically by np.zeros there.
 
     def process_core_orbitals(self):
         """Reconstruct frozen-core MO coefficient matrix in the spherical-harmonic basis.
@@ -564,7 +609,7 @@ class ADFToStoWF:
         molorb = 0
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
-            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:atom])
+            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre_orig[:atom])
             Ncore_harmbasfns = sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
             core_coeff = np.zeros([Ncore_harmbasfns])
             ccor_per_shell = np.array_split(self.ccor_per_atomtype[at], np.cumsum((self.nrcset * self.nrcorb)[at, :]))[:-1]
@@ -625,15 +670,16 @@ class ADFToStoWF:
             norm_per_harmbasfn  – flat norm array over all basis functions
         """
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
-        # core_molorb_coeff has shape (Nharmbasfns, Ncore_molorbs) — allocated in process_core_orbitals
-        # valence_molorb_harm_coeff may have fewer rows when exact_cart2harm=False (only spherical part)
-        # or more rows when exact_cart2harm=True (spherical + contamination shells appended).
-        # Both must have exactly Nharmbasfns rows to concatenate along axis=1.
+        # After extract_contamination_shells, Nharmbasfns has been updated to include the new
+        # contamination-AO rows.  valence_molorb_harm_coeff was extended with zero rows there.
+        # core_molorb_coeff is allocated by process_core_orbitals (which runs after
+        # extract_contamination_shells) using the already-updated Nharmbasfns, so its extra rows
+        # are zero-initialised automatically.  Both must have exactly Nharmbasfns rows.
+        assert self.core_molorb_coeff.shape[0] == self.Nharmbasfns
         for sp in range(self.Nspins):
-            n_val = self.valence_molorb_harm_coeff[sp].shape[0]
-            if n_val < self.Nharmbasfns:
-                pad = np.zeros((self.Nharmbasfns - n_val, self.valence_molorb_harm_coeff[sp].shape[1]))
-                self.valence_molorb_harm_coeff[sp] = np.concatenate([self.valence_molorb_harm_coeff[sp], pad], axis=0)
+            assert self.valence_molorb_harm_coeff[sp].shape[0] == self.Nharmbasfns, (
+                f'spin {sp}: valence_molorb_harm_coeff has {self.valence_molorb_harm_coeff[sp].shape[0]} rows, ' f'expected {self.Nharmbasfns}'
+            )
         self.coeff = [np.concatenate([self.core_molorb_coeff, self.valence_molorb_harm_coeff[sp]], axis=1) for sp in range(self.Nspins)]
         if False:
             print('molorb sparsity:')
@@ -641,7 +687,25 @@ class ADFToStoWF:
                 for i in range(self.Nmolorbs[sp]):
                     print(''.join(np.array(['.', 'X'])[(self.coeff[sp][:, i] != 0.0) * 1]))
 
-        self.norm_per_centre = [np.concatenate([self.core_cartnorm_per_atomtype[at], self.valence_cartnorm_per_atomtype[at]]) for at in self.atyp_idx]
+        # norm_per_centre covers core + valence shells in the original basis.
+        # Extra s-shells added by extract_contamination_shells are appended with norm=1.0
+        # as a placeholder (the actual normalization will be applied when coefficients are filled).
+        Nnew_shells_per_atom = [
+            self.Nharmbasfns_per_centre[atom]
+            - sum(self.Nharmpoly_per_shelltype[st] for st in self.core_shelltype_per_atomtype[self.atyp_idx[atom]])
+            - self.Nvalence_harmbasfns_per_centre[atom]
+            for atom in range(self.Natoms)
+        ]
+        self.norm_per_centre = [
+            np.concatenate(
+                [
+                    self.core_cartnorm_per_atomtype[self.atyp_idx[atom]],
+                    self.valence_cartnorm_per_atomtype[self.atyp_idx[atom]],
+                    np.ones(Nnew_shells_per_atom[atom]),
+                ]
+            )
+            for atom in range(self.Natoms)
+        ]
         self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
     def setup_stowfn(self):
