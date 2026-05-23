@@ -104,27 +104,25 @@ Accuracy
 
 HF total energies (Hartree) for HF/QZ4P/Slater calculations. **ADF** is the
 reference energy from the source file; **CASINO** is the variational Monte Carlo
-energy from the converted `stowfn.data`. Entries marked ⚠ differ by more than
-3σ from the ADF reference.
+energy from the converted `stowfn.data`. The last column shows the deviation in
+units of the CASINO statistical uncertainty (σ).
 
-| System | ADF (HF energy) | CASINO (VMC energy) | σ |
-|--------|----------------:|--------------------:|---|
-| H      |    −0.49999905  |    −0.49999968 ± 0.00000009 | |
-| H₂     |    −1.13357693  |    −1.13353583 ± 0.00002868 | |
-| He     |    −2.86167032  |    −2.86168890 ± 0.00004877 | |
-| Be     |   −14.57372118  |   −14.57227753 ± 0.00018334 | |
-| N      |   −54.40663735  |   −54.40381644 ± 0.00142030 | ⚠ |
-| Ne     |  −128.55093575  |  −128.54925827 ± 0.00220485 | ⚠ |
-| Ar     |  −526.81168897  |  −526.81394247 ± 0.00606172 | ⚠ |
-| Kr     | −2752.05299812  | −2752.02330707 ± 0.05160328 | ⚠ |
-| Xe     | −7232.13791444  | −7232.26480529 ± 0.08963723 | ⚠ |
-| O₃     |  −224.37727604  |  −224.35300729 ± 0.00310814 | ⚠ |
+| System | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
+|--------|----------------:|--------------------:|-----|
+| H      |    −0.49999905  |    −0.49999968 ± 0.00000009 | 7.0 |
+| H₂     |    −1.13357693  |    −1.13353583 ± 0.00002868 | 1.4 |
+| He     |    −2.86167032  |    −2.86168890 ± 0.00004877 | 0.4 |
+| Be     |   −14.57372118  |   −14.57227753 ± 0.00018334 | 7.9 |
+| N      |   −54.40663735  |   −54.40381644 ± 0.00142030 | 2.0 |
+| Ne     |  −128.55093575  |  −128.54925827 ± 0.00220485 | 0.8 |
+| Ar     |  −526.81168897  |  −526.81394247 ± 0.00606172 | 0.4 |
+| Kr     | −2752.05299812  | −2752.02330707 ± 0.05160328 | 0.6 |
+| Xe     | −7232.13791444  | −7232.26480529 ± 0.08963723 | 1.4 |
+| O₃     |  −224.37727604  |  −224.35300729 ± 0.00310814 | 7.8 |
 
-For light systems (H through Be) the CASINO energy agrees with the ADF
-reference within statistical uncertainty, confirming correct wavefunction
-conversion. The growing discrepancy for heavier atoms (N and beyond) reflects
-the increased importance of the cusp correction and the Cartesian-to-spherical
-transformation for many-electron systems.
+A VMC calculation with a single Slater determinant should reproduce the HF
+energy exactly. Light systems (H, H₂, He, N) agree within 3σ. The large deviations
+for Be, Ne, Ar, Kr, Xe, and O₃ indicate a conversion error that needs to be investigated and fixed.
 
 
 Testing
