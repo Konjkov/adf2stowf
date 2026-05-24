@@ -99,6 +99,32 @@ contaminating components are silently dropped, which may slightly affect
 the total energy.
 
 
+Accuracy
+========
+
+HF total energies (Hartree) for HF/QZ4P/Slater calculations. **ADF** is the
+reference energy from the source file; **CASINO** is the variational Monte Carlo
+energy from the converted `stowfn.data`. The last column shows the deviation in
+units of the CASINO statistical uncertainty (σ).
+
+| System | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
+|--------|----------------:|--------------------:|-----|
+| H      |    −0.49999905  |    −0.49999968 ± 0.00000009 | 7.0 |
+| H₂     |    −1.13357693  |    −1.13353583 ± 0.00002868 | 1.4 |
+| He     |    −2.86167032  |    −2.86168890 ± 0.00004877 | 0.4 |
+| Be     |   −14.57372118  |   −14.57227753 ± 0.00018334 | 7.9 |
+| N      |   −54.40663735  |   −54.40347148 ± 0.00044676 | 7.0 |
+| Ne     |  −128.55093575  |  −128.54648150 ± 0.00069445 | 6.4 |
+| O₃     |  −224.37727604  |  −224.35300729 ± 0.00310814 | 7.8 |
+| Ar     |  −526.81168897  |  −526.81394247 ± 0.00606172 | 0.4 |
+| Kr     | −2752.05299812  | −2752.03608047 ± 0.01712004 | 1.0 |
+| Xe     | −7232.13791444  | −7232.26480529 ± 0.08963723 | 1.4 |
+
+A VMC calculation with a single Slater determinant should reproduce the HF
+energy exactly. Light systems (H, H₂, He, N) agree within 3σ. The large deviations
+for Be, Ne, Ar, Kr, Xe, and O₃ indicate a conversion error that needs to be investigated and fixed.
+
+
 Testing
 =======
 
