@@ -107,15 +107,6 @@ reference energy from the source file; **CASINO** is the variational Monte Carlo
 energy from the converted `stowfn.data`. The last column shows the deviation in
 units of the CASINO statistical uncertainty (σ).
 
-**Note on numerical integration accuracy.**
-ADF evaluates integrals on a numerical atom-centered grid. At the default
-`NUMERICALQUALITY good` setting the quadrature error can reach 1–2 mHa, making
-the ADF total energy an unreliable reference for sub-mHa comparisons with CASINO.
-Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
-against VMC energies:
-
- NUMERICALQUALITY      excellent
-
 The ADF energies in the table below were obtained with this setting.
 
 | System | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
@@ -127,13 +118,20 @@ The ADF energies in the table below were obtained with this setting.
 | N      |   −54.40446246  |   −54.40440785 ± 0.00044673 | 0.1 |
 | Ne     |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
 | O₃     |  −224.36156862  |  −224.35293068 ± 0.00300164 | 2.9 |
-| Ar     |  −526.81670427  |  −526.81992506 ± 0.00622439 | 0.5 |
-| Kr     | −2752.05365745  | −2752.03608047 ± 0.01712004 | 1.0 |
-| Xe     | −7232.13699292  | −7232.26480529 ± 0.08963723 | 1.4 |
+| Ar     |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
+| Kr     | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
+| Xe     | −7232.13699292  | −7231.98305398 ± 0.12085615 | 1.3 |
+
+**Note on numerical integration accuracy.**
+ADF evaluates integrals on a numerical atom-centered grid. At the default
+`NUMERICALQUALITY good` setting the quadrature error can reach 1–2 mHa, making
+the ADF total energy an unreliable reference for sub-mHa comparisons with CASINO.
+Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
+against VMC energies.
 
 A VMC calculation with a single Slater determinant should reproduce the HF
-energy exactly. Light systems (H, H₂, He, N) agree within 3σ. The large deviations
-for Be, Ne, Ar, Kr, Xe, and O₃ indicate a conversion error that needs to be investigated and fixed.
+energy exactly. The large deviations for Be and O₃ indicate a conversion error
+that needs to be investigated and fixed.
 
 
 Testing
