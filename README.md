@@ -120,7 +120,7 @@ The ADF energies in the table below were obtained with this setting.
 | O₃     |  −224.36156862  |  −224.35293068 ± 0.00300164 | 2.9 |
 | Ar     |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
 | Kr     | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
-| Xe     | −7232.13699292  | −7231.98305398 ± 0.12085615 | 1.3 |
+| Xe     | −7232.13699292  | -7232.08669813 ± 0.03351053 | 1.5 |
 
 **Note on numerical integration accuracy.**
 ADF evaluates integrals on a numerical atom-centered grid. At the default
