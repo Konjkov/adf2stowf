@@ -187,7 +187,8 @@ Shell type encoding in stowfn.data: `s=1, sp=2, p=3, d=4, f=5, g=6`
 
 6. **Cusp enforcing** (`--cusp-method=enforce`) uses a linear operator derived in
    `stowfn.py:cusp_enforcing_matrix()` that modifies s-type orbital coefficients
-   at each nucleus to satisfy the cusp condition exactly.
+   at each nucleus to satisfy the cusp condition exactly. Any changes to cusp math
+   must be validated against all examples/.
 
 7. **Units**: all positions in ADF TAPE21 are in bohr (atomic units). CASINO also
    uses bohr. No unit conversion is needed.
