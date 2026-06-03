@@ -196,6 +196,7 @@ class ADFToStoWF:
         Sets attributes (among others):
             ncset                              – total number of core STO shells
             ncorpt                             – 0-based shell pointer per atom type
+            ccor                               – raw flattened core MO coefficient array from TAPE21
             nqcor, lqcor, alfcor, cornrm       – raw TAPE21 arrays (n, l, ζ, norm)
             nrcset                             – shape (Natomtypes, 4): shell counts per l
             core_shelltype                     – CASINO shelltype code per core shell
@@ -214,6 +215,7 @@ class ADFToStoWF:
         assert np.all(self.Ncore_shells_per_atomtype == self.nrcset.sum(axis=1))
         assert self.ncset == self.nrcset.sum()
 
+        self.ccor = self.Core['ccor']
         self.nqcor = self.Core['nqcor']
         self.lqcor = self.Core['lqcor']
         self.alfcor = self.Core['alfcor']
@@ -222,8 +224,7 @@ class ADFToStoWF:
         self.core_shelltype_per_atomtype = [self.core_shelltype[self.ncorpt[a] : self.ncorpt[a + 1]] for a in range(self.Natomtypes)]
         self.core_order_r = self.nqcor - self.lqcor - 1
         self.core_order_r_per_atomtype = [self.core_order_r[self.ncorpt[a] : self.ncorpt[a + 1]] for a in range(self.Natomtypes)]
-        self.core_zeta = self.alfcor
-        self.core_zeta_per_atomtype = [self.core_zeta[self.ncorpt[a] : self.ncorpt[a + 1]] for a in range(self.Natomtypes)]
+        self.core_zeta_per_atomtype = [self.alfcor[self.ncorpt[a] : self.ncorpt[a + 1]] for a in range(self.Natomtypes)]
         self.core_cartnorm = self.cornrm
         self.core_cartnorm_per_atomtype_per_shell = [self.core_cartnorm[self.ncorpt[a] : self.ncorpt[a + 1]] for a in range(self.Natomtypes)]
         self.core_cartnorm_per_atomtype = []
@@ -504,18 +505,16 @@ class ADFToStoWF:
 
         Sets attributes:
             nrcorb                     – shape (Natomtypes, 4): core MO counts per l per atom type
-            ccor                       – raw flattened core MO coefficient array from TAPE21
             Ncoremolorbs_per_atomtype  – total number of core MOs per atom type (counting harmonics)
             Ncoremolorbs_per_centre    – core MO count mapped to each atom
             Ncore_molorbs              – grand total of core MOs across all atoms
             core_molorb_coeff          – full coefficient matrix (Nharmbasfns × Ncore_molorbs)
         """
         self.nrcorb = self.Core['nrcorb'].reshape(self.Natomtypes, 4)
-        self.ccor = self.Core['ccor']
         self.Nccor_per_atomtype = (self.nrcset * self.nrcorb).sum(axis=1)
         assert len(self.ccor) == self.Nccor_per_atomtype.sum()
         self.ccor_per_atomtype = np.array_split(self.ccor, np.cumsum(self.Nccor_per_atomtype))[:-1]
-        self.Ncoremolorbs_per_atomtype = (self.nrcorb * np.array([1, 3, 5, 7])[None, :]).sum(axis=1)
+        self.Ncoremolorbs_per_atomtype = self.nrcorb @ np.array([1, 3, 5, 7])
         self.Ncoremolorbs_per_centre = self.Ncoremolorbs_per_atomtype[self.atyp_idx]
         self.Ncore_molorbs = self.Ncoremolorbs_per_centre.sum()
         self.core_molorb_coeff = np.zeros((self.Nharmbasfns, self.Ncore_molorbs))
@@ -612,6 +611,7 @@ class ADFToStoWF:
         self.sto.atomcharge = self.total_charge_per_atomtype[self.atyp_idx]
         assert len(self.sto.atomcharge) == self.Natoms
         eionion = 0.0
+        print(self.Geometry['Atomic Distances'])
         if self.Natoms > 1:
             adist = self.Geometry['Atomic Distances'].reshape(self.Natoms + 1, self.Natoms + 1)[1:, 1:]
             for i in range(self.Natoms):
@@ -622,10 +622,9 @@ class ADFToStoWF:
                     eionion += self.sto.atomcharge[i] * self.sto.atomcharge[j] / adist[i, j]
             self.sto.nuclear_repulsion_energy = eionion / self.Natoms
         self.sto.num_elec = self.Nvalence_electrons + 2 * self.Ncore_molorbs
-        self.sto.atompos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
+        self.sto.atompos = self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
         self.sto.atomnum = self.atomicnumber_per_atomtype[self.atyp_idx]
-        self.sto.num_centres = int(self.Natoms)
-        self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
+        self.sto.num_centres = self.Natoms
         self.sto.num_shells = np.sum(self.Nshells_per_centre)
         self.sto.idx_first_shell_on_centre = np.array([0] + list(np.cumsum(self.Nshells_per_centre)))
         self.sto.shelltype = np.concatenate(self.shelltype_per_centre)
