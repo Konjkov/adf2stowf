@@ -564,11 +564,6 @@ class ADFToStoWF:
         the orbital (column) axis for each spin channel, producing a single
         ``coeff`` matrix of shape (Nharmbasfns, Ncore_molorbs + Nvalence_molorbs).
 
-        When ``extract_contamination_shells`` has been called, the valence
-        block may have extra rows (contamination-shell coefficients appended
-        below the spherical-harmonic rows).  Any missing rows are zero-padded
-        to Nharmbasfns so the concatenation is always well-formed.
-
         Also builds ``norm_per_harmbasfn``, the flat array of ADF Cartesian
         normalisation factors (one entry per spherical-harmonic basis function
         across all centres) used later by ``StoWfn.check_and_normalize``.
@@ -576,13 +571,9 @@ class ADFToStoWF:
         Sets attributes:
             Nmolorbs            – array of total MO counts per spin (core + valence)
             coeff               – list (per spin) of full coefficient matrices
-            norm_per_centre     – list (per atom) of concatenated core+valence norms
-            norm_per_harmbasfn  – flat norm array over all basis functions
         """
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
         self.coeff = [np.concatenate([self.core_molorb_coeff, self.valence_molorb_harm_coeff[sp]], axis=1) for sp in range(self.Nspins)]
-        self.norm_per_centre = [np.concatenate([self.core_cartnorm_per_atomtype[at], self.valence_cartnorm_per_atomtype[at]]) for at in self.atyp_idx]
-        self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
     def setup_stowfn(self):
         """Populate a StoWfn object with geometry, basis, and MO data.
