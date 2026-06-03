@@ -493,12 +493,14 @@ class ADFToStoWF:
 
         Core orbitals are produced for each atom of that type by iterating over
         ``atyp_idx``.  For each angular-momentum channel (s, p, d, f) the
-        number of MOs is taken from ``nrcorb``, and for each MO the coefficients
-        are placed at the appropriate spherical-harmonic rows:
-          - s-type: 1 coefficient per shell
-          - p-type: 3 coefficients (one per Cartesian component, interleaved)
-          - d-type: 5 coefficients (not yet supported — raises NotImplementedError)
-          - f-type: 7 coefficients (not yet supported — raises NotImplementedError)
+        number of MOs is taken from ``nrcorb``, and the coefficients are
+        unpacked via vectorised reshape + advanced indexing:
+
+          For l-channel with ``n_harm`` harmonics (1/3/5/7 for s/p/d/f) and
+          ``Nshells`` basis shells, the raw ``ccor`` block has shape
+          ``(Norbs, Nshells)`` and maps to interleaved rows
+          ``offset + i + s * n_harm`` (i = harmonic index, s = shell index)
+          for each of the ``Norbs * n_harm`` output MO columns.
 
         Sets attributes:
             nrcorb                     – shape (Natomtypes, 4): core MO counts per l per atom type
@@ -517,45 +519,43 @@ class ADFToStoWF:
         self.Ncoremolorbs_per_centre = self.Ncoremolorbs_per_atomtype[self.atyp_idx]
         self.Ncore_molorbs = self.Ncoremolorbs_per_centre.sum()
         self.core_molorb_coeff = np.zeros((self.Nharmbasfns, self.Ncore_molorbs))
+
+        # n_harm per l-channel: s=1, p=3, d=5, f=7
+        n_harm_per_l = np.array([1, 3, 5, 7])
+        # Precompute per-atomtype: cumulative harmbasfn offset of each l-block within core region
+        # offset_l[at, l] = sum of n_shells[at, 0..l-1] * n_harm[0..l-1]
+        core_harmbasfn_offsets = np.zeros((self.Natomtypes, 4), dtype=int)
+        for l in range(1, 4):
+            core_harmbasfn_offsets[:, l] = core_harmbasfn_offsets[:, l - 1] + self.nrcset[:, l - 1] * n_harm_per_l[l - 1]
+
         molorb = 0
+        first_harmbasfns = np.concatenate([[0], np.cumsum(self.Nharmbasfns_per_centre)])
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
-            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:atom])
-            Ncore_harmbasfns = sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
-            core_coeff = np.zeros([Ncore_harmbasfns])
             ccor_per_shell = np.array_split(self.ccor_per_atomtype[at], np.cumsum((self.nrcset * self.nrcorb)[at, :]))[:-1]
-            for shell in range(self.nrcorb[at, 0]):
-                core_coeff[:] = 0.0
-                core_coeff[0 : self.nrcset[at, 0]] = ccor_per_shell[0][self.nrcset[at, 0] * shell : self.nrcset[at, 0] * (shell + 1)]
-                self.core_molorb_coeff[first_harmbasfn : first_harmbasfn + Ncore_harmbasfns, molorb] = core_coeff
-                molorb += 1
-            for shell in range(self.nrcorb[at, 1]):
-                for i in range(3):
-                    core_coeff[:] = 0.0
-                    offset = self.nrcset[at, 0]
-                    core_coeff[offset + i : offset + self.nrcset[at, 1] * 3 : 3] = ccor_per_shell[1][
-                        self.nrcset[at, 1] * shell : self.nrcset[at, 1] * (shell + 1)
-                    ]
-                    self.core_molorb_coeff[first_harmbasfn : first_harmbasfn + Ncore_harmbasfns, molorb] = core_coeff
-                    molorb += 1
-            for shell in range(self.nrcorb[at, 2]):
-                for i in range(5):
-                    core_coeff[:] = 0.0
-                    offset = self.nrcset[at, 0] + self.nrcset[at, 1]
-                    core_coeff[offset + i : offset + self.nrcset[at, 2] * 5 : 5] = ccor_per_shell[2][
-                        self.nrcset[at, 2] * shell : self.nrcset[at, 2] * (shell + 1)
-                    ]
-                    self.core_molorb_coeff[first_harmbasfn : first_harmbasfn + Ncore_harmbasfns, molorb] = core_coeff
-                    molorb += 1
-            for shell in range(self.nrcorb[at, 3]):
-                for i in range(7):
-                    core_coeff[:] = 0.0
-                    offset = self.nrcset[at, 0] + self.nrcset[at, 1] + self.nrcset[at, 2]
-                    core_coeff[offset + i : offset + self.nrcset[at, 3] * 7 : 7] = ccor_per_shell[3][
-                        self.nrcset[at, 3] * shell : self.nrcset[at, 3] * (shell + 1)
-                    ]
-                    self.core_molorb_coeff[first_harmbasfn : first_harmbasfn + Ncore_harmbasfns, molorb] = core_coeff
-                    molorb += 1
+
+            for l, n_harm in enumerate(n_harm_per_l):
+                Nshells = self.nrcset[at, l]  # basis shells for this l
+                Norbs = self.nrcorb[at, l]  # MOs for this l
+                if Norbs == 0:
+                    continue
+                # ccor_per_shell[l]: flat array of shape (Norbs * Nshells,)
+                # Reshape to (Norbs, Nshells), then expand harmonics → (Norbs, n_harm, Nshells)
+                # The target block in core_molorb_coeff has shape (Ncore_harmbasfns, Norbs * n_harm)
+                # and the l-block rows are offset + i with stride n_harm (interleaved layout):
+                #   row offset_l + i + n_harm*s  for s in 0..Nshells-1, i in 0..n_harm-1
+                coeffs = ccor_per_shell[l].reshape(Norbs, Nshells)  # (Norbs, Nshells)
+                offset = core_harmbasfn_offsets[at, l]
+                # Build interleaved index: for each harmonic component i, rows are
+                # offset + i, offset + n_harm + i, ..., offset + (Nshells-1)*n_harm + i
+                shell_rows = offset + np.arange(Nshells) * n_harm  # (Nshells,)
+                for i in range(n_harm):
+                    # coeffs[:, :]  has shape (Norbs, Nshells)
+                    # column molorb + i*Norbs + orb  ← orb-th MO, component i
+                    # We write all Norbs MOs for component i at once:
+                    self.core_molorb_coeff[first_harmbasfns[atom] + shell_rows + i, molorb + np.arange(Norbs) * n_harm + i] = coeffs.T
+                molorb += Norbs * n_harm
+
         assert molorb == self.Ncore_molorbs
 
     def finalize_coefficients(self):
@@ -582,12 +582,6 @@ class ADFToStoWF:
         """
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
         self.coeff = [np.concatenate([self.core_molorb_coeff, self.valence_molorb_harm_coeff[sp]], axis=1) for sp in range(self.Nspins)]
-        if False:
-            print('molorb sparsity:')
-            for sp in range(self.Nspins):
-                for i in range(self.Nmolorbs[sp]):
-                    print(''.join(np.array(['.', 'X'])[(self.coeff[sp][:, i] != 0.0) * 1]))
-
         self.norm_per_centre = [np.concatenate([self.core_cartnorm_per_atomtype[at], self.valence_cartnorm_per_atomtype[at]]) for at in self.atyp_idx]
         self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
