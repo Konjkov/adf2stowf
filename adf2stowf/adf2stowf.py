@@ -461,33 +461,19 @@ class ADFToStoWF:
         ]
 
     def extract_contamination_shells(self):
-        """Add extra STO shells to capture Cartesian contamination components exactly.
+        """Add extra STO shells for Cartesian contamination components with correct MO coefficients.
 
-        Cartesian d- and f-shells contain non-physical components beyond the pure
-        spherical-harmonic subspace.  Rather than discarding these components
-        (which would make the cart→sph transformation lossy), a new STO shell of
-        the appropriate lower angular momentum is added to the same centre with
-        the same ζ and ``order_r + 2``:
+        Cartesian d- and f-shells span a larger space than their spherical counterparts:
 
-        **D-shell** (shelltype=4, 6 Cartesian → 5 spherical + 1 contamination):
-          The 6th Cartesian function is x²+y²+z² = r²·Y₀⁰·const, which has s-type
-          angular symmetry but radial factor r^(order_r+2).  One new **s-shell**
-          (shelltype=1) is added per d-shell, contributing **1 new AO row**.
+        **D-shell** (shelltype=4, 6 Cartesian → 5 spherical + 1 s-contamination):
+          x²+y²+z² = r²·Y₀⁰·const has s-type angular symmetry with radial factor
+          r^(order_r+2).  One new **s-shell** (shelltype=1, order_r+2, same ζ) is
+          added per d-shell, contributing **1 new AO row**.
 
-        **F-shell** (shelltype=5, 10 Cartesian → 7 spherical + 3 contamination):
-          The 3 contamination functions are {x, y, z}·r² = p-type·r², i.e. they
-          have p-type angular symmetry with radial factor r^(order_r+2).  One new
-          **p-shell** (shelltype=3) is added per f-shell, contributing **3 new AO
-          rows** (px, py, pz).
-
-        Each new shell is registered in the per-centre geometry arrays
-        (shelltype, order_r, zeta, shell count).  AO coefficients are left as zero
-        here; they will be filled in a later step once normalization is established.
-
-        After adding all extra shells, ``Nharmbasfns`` and
-        ``Nharmbasfns_per_centre`` are updated, and both ``valence_molorb_harm_coeff``
-        and ``core_molorb_coeff`` are extended with matching zero rows so that all
-        coefficient matrices remain consistent with the new basis size.
+        **F-shell** (shelltype=5, 10 Cartesian → 7 spherical + 3 p-contamination):
+          {x,y,z}·r² have p-type angular symmetry with radial factor r^(order_r+2).
+          One new **p-shell** (shelltype=3, order_r+2, same ζ) is added per f-shell,
+          contributing **3 new AO rows** (px, py, pz).
         """
         # Track how many new AO rows are added per atom (for Nharmbasfns bookkeeping).
         # Each new s-shell adds 1 AO; each new p-shell adds 3 AOs.
@@ -535,28 +521,10 @@ class ADFToStoWF:
         self.Nharmbasfns_per_centre = [self.Nharmbasfns_per_centre[atom] + Nnew_ao_per_atom[atom] for atom in range(self.Natoms)]
         self.Nharmbasfns += Nnew_ao_total
 
-        # Insert zero rows for the new AOs at the correct position in the coefficient
-        # matrix.  CASINO reads AOs atom by atom in shell order, so the new shells on
-        # atom k must appear immediately after the existing AOs of atom k — not at the
-        # end of the entire matrix.
-        #
-        # Original row layout (132 rows for O3 example):
-        #   [0:44]   = atom 0 orig AOs
-        #   [44:88]  = atom 1 orig AOs
-        #   [88:132] = atom 2 orig AOs
-        #
-        # Required layout after insertion (156 rows):
-        #   [0:52]    = atom 0 (44 orig + 8 new)
-        #   [52:104]  = atom 1 (44 orig + 8 new)
-        #   [104:156] = atom 2 (44 orig + 8 new)
-        #
-        # We process atoms from last to first so that insertion points in the
-        # original matrix are not shifted by earlier insertions.
         for sp in range(self.Nspins):
-            mat = self.valence_molorb_harm_coeff[sp]  # (Nharmbasfns_old, Nmo)
+            mat = self.valence_molorb_harm_coeff[sp]
             Nmo = mat.shape[1]
-            # Insertion point in the OLD matrix: end of atom k's original block.
-            insert_at = np.cumsum(self.Nharmbasfns_per_centre_orig)  # e.g. [44, 88, 132]
+            insert_at = np.cumsum(self.Nharmbasfns_per_centre_orig)
             for atom in range(self.Natoms - 1, -1, -1):
                 if Nnew_ao_per_atom[atom] == 0:
                     continue
