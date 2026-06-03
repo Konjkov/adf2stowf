@@ -37,6 +37,7 @@ class ADFToStoWF:
         self.Basis = self.data['Basis']
         self.Core = self.data['Core']
         self.Symmetry = self.data['Symmetry']
+        self.Total_Energy = self.data['Total Energy']
 
         self._parse_system()
         self.Nharmpoly_per_shelltype, self.Ncartpoly_per_shelltype, self.harm2cart_map, self.cart2harm_map = self._build_cart2harm_maps()
@@ -598,20 +599,11 @@ class ADFToStoWF:
         self.sto.code = 'ADF'
         self.sto.periodicity = 0
         self.sto.spin_unrestricted = not self.spin_restricted
-        self.sto.nuclear_repulsion_energy = 0.0
         self.sto.atomcharge = self.total_charge_per_atomtype[self.atyp_idx]
         assert len(self.sto.atomcharge) == self.Natoms
-        eionion = 0.0
-        print(self.Geometry['Atomic Distances'])
+        self.sto.nuclear_repulsion_energy = 0.0
         if self.Natoms > 1:
-            adist = self.Geometry['Atomic Distances'].reshape(self.Natoms + 1, self.Natoms + 1)[1:, 1:]
-            for i in range(self.Natoms):
-                assert adist[i, i] == 0.0
-                for j in range(i):
-                    assert adist[i, j] == adist[j, i]
-                    assert adist[i, j] > 0.0
-                    eionion += self.sto.atomcharge[i] * self.sto.atomcharge[j] / adist[i, j]
-            self.sto.nuclear_repulsion_energy = eionion / self.Natoms
+            self.sto.nuclear_repulsion_energy = self.Total_Energy['Nuclear repulsion energy'][0] / self.Natoms
         self.sto.num_elec = self.Nvalence_electrons + 2 * self.Ncore_molorbs
         self.sto.atompos = self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
         self.sto.atomnum = self.atomicnumber_per_atomtype[self.atyp_idx]
