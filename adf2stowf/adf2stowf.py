@@ -461,57 +461,99 @@ class ADFToStoWF:
         ]
 
     def extract_contamination_shells(self):
-        """Add extra STO shells for Cartesian contamination components with correct MO coefficients.
+        """Add extra STO shells to capture Cartesian contamination components exactly.
 
-        Cartesian d- and f-shells span a larger space than their spherical counterparts:
+        Cartesian d- and f-shells contain non-physical components beyond the pure
+        spherical-harmonic subspace.  Rather than discarding these components
+        (which would make the cart→sph transformation lossy), a new STO shell of
+        the appropriate lower angular momentum is added to the same centre with
+        the same ζ and ``order_r + 2``:
 
-        **D-shell** (shelltype=4, 6 Cartesian → 5 spherical + 1 s-contamination):
-          x²+y²+z² = r²·Y₀⁰·const has s-type angular symmetry with radial factor
-          r^(order_r+2).  One new **s-shell** (shelltype=1, order_r+2, same ζ) is
-          added per d-shell, contributing **1 new AO row**.
+        **D-shell** (shelltype=4, 6 Cartesian → 5 spherical + 1 contamination):
+          The 6th Cartesian function is x²+y²+z² = r²·Y₀⁰·const, which has s-type
+          angular symmetry but radial factor r^(order_r+2).  One new **s-shell**
+          (shelltype=1) is added per d-shell, contributing **1 new AO row**.
 
-        **F-shell** (shelltype=5, 10 Cartesian → 7 spherical + 3 p-contamination):
-          {x,y,z}·r² have p-type angular symmetry with radial factor r^(order_r+2).
-          One new **p-shell** (shelltype=3, order_r+2, same ζ) is added per f-shell,
-          contributing **3 new AO rows** (px, py, pz).
+        **F-shell** (shelltype=5, 10 Cartesian → 7 spherical + 3 contamination):
+          The 3 contamination functions are {x, y, z}·r² = p-type·r², i.e. they
+          have p-type angular symmetry with radial factor r^(order_r+2).  One new
+          **p-shell** (shelltype=3) is added per f-shell, contributing **3 new AO
+          rows** (px, py, pz).
+
+        Each new shell is registered in the per-centre geometry arrays
+        (shelltype, order_r, zeta, shell count).  AO coefficients are left as zero
+        here; they will be filled in a later step once normalization is established.
+
+        After adding all extra shells, ``Nharmbasfns`` and
+        ``Nharmbasfns_per_centre`` are updated, and both ``valence_molorb_harm_coeff``
+        and ``core_molorb_coeff`` are extended with matching zero rows so that all
+        coefficient matrices remain consistent with the new basis size.
         """
-        # Track how many new AO rows are added per atom (for Nharmbasfns bookkeeping).
-        # Each new s-shell adds 1 AO; each new p-shell adds 3 AOs.
+        # Only d-shells produce contamination (s-type: x²+y²+z² = r²).
+        # f-shells are not handled here by design.
+        # Each new s-shell adds 1 AO.
         Nnew_ao_per_atom = np.zeros(self.Natoms, dtype=int)
 
-        j = 0
+        # s-contamination extractor row: cart2harm_map[4][5]
+        # For a d-shell with Cartesian coefficients C and ADF norms bn:
+        #   phys_contam = s_contam_row @ (C * bn)
+        s_contam_row = self.cart2harm_map[4][5]  # shape (6,)
+
+        # j_atom[atom]: global Cartesian column offset for the start of atom's block
+        # in molorb_cart_coeff (shape: Nmo x Nvalence_cartbasfn_total)
+        j_atom = np.concatenate([[0], np.cumsum(self.Nvalence_cartbasfn_per_centre)])
+
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
+            bnorm = self.valence_cartnorm_per_atomtype[at]
+            shell_types = self.valence_shelltype_per_atomtype[at]
+            n_ao_cumsum = np.concatenate([[0], np.cumsum(self.Ncartpoly_per_shelltype[shell_types])])
+
             for shell in range(self.Nvalence_shells_per_atomtype[at]):
-                st = self.valence_shelltype_per_atomtype[at][shell]
-                n_cart = self.Ncartpoly_per_shelltype[st]
+                st = shell_types[shell]
                 new_order_r = int(self.valence_order_r_per_atomtype[at][shell]) + 2
                 new_zeta = float(self.valence_zeta_per_atomtype[at][shell])
 
                 if st == 4:  # d-shell: 1 s-type contamination (x²+y²+z² = r²·s)
-                    # The 6th Cartesian d-function x²+y²+z² has s-type angular symmetry
-                    # and radial factor r^(order_r+2).  Represent it as a new s-shell.
-                    # AO coefficients will be filled in a subsequent step; for now zero.
+                    # j_local_{start,end}: column indices within this atom's Cartesian block
+                    # j_global_{start,end}: column indices in molorb_cart_coeff (all atoms)
+                    j_local_start = int(n_ao_cumsum[shell])
+                    j_local_end = int(n_ao_cumsum[shell + 1])
+                    j_global_start = int(j_atom[atom]) + j_local_start
+                    j_global_end = int(j_atom[atom]) + j_local_end
+                    bn = bnorm[j_local_start:j_local_end]  # shape (6,)
+
+                    # phys_contam[mo] = s_contam_row @ (C_cart[mo,:] * bn)
+                    # = physical amplitude of x²+y²+z² component in each MO
+                    for sp in range(self.Nspins):
+                        C = self.molorb_cart_coeff[sp][:, j_global_start:j_global_end]  # (Nmo, 6)
+                        phys_contam = (C * bn) @ s_contam_row  # (Nmo,)
+                        norm_contam = np.linalg.norm(phys_contam)
+                        print(
+                            f'd-contam atom={atom} shell={shell} '
+                            f'order_r={new_order_r-2} zeta={new_zeta:.4f} sp={sp}: '
+                            f'||phys_contam||={norm_contam:.6e}  '
+                            f'per_mo={np.round(phys_contam, 6)}'
+                        )
+
                     self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 1)
                     self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
                     self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
                     self.Nshells_per_centre[atom] += 1
                     Nnew_ao_per_atom[atom] += 1  # 1 new s-AO
 
-                elif st == 5:  # f-shell: 3 p-type contaminations ({x,y,z}·r²)
-                    # The 3 contamination modes are p_x·r², p_y·r², p_z·r²:
-                    # they share the same ζ and order_r+2 as the parent f-shell
-                    # and together form one p-shell (shelltype=3).
-                    # AO coefficients will be filled in a subsequent step; for now zero.
-                    self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 3)
-                    self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
-                    self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
-                    self.Nshells_per_centre[atom] += 1
-                    Nnew_ao_per_atom[atom] += 3  # 3 new p-AOs (px, py, pz)
+                # elif st == 5:  # f-shell: 3 p-type contaminations ({x,y,z}·r²)
+                #     # The 3 contamination modes are p_x·r², p_y·r², p_z·r²:
+                #     # they share the same ζ and order_r+2 as the parent f-shell
+                #     # and together form one p-shell (shelltype=3).
+                #     # AO coefficients will be filled in a subsequent step; for now zero.
+                #     self.shelltype_per_centre[atom] = np.append(self.shelltype_per_centre[atom], 3)
+                #     self.order_r_per_centre[atom] = np.append(self.order_r_per_centre[atom], new_order_r)
+                #     self.zeta_per_centre[atom] = np.append(self.zeta_per_centre[atom], new_zeta)
+                #     self.Nshells_per_centre[atom] += 1
+                #     Nnew_ao_per_atom[atom] += 3  # 3 new p-AOs (px, py, pz)
 
-                j += n_cart
-
-        assert j == self.Nvalence_cartbasfn
+        assert int(j_atom[-1]) == self.Nvalence_cartbasfn
 
         Nnew_ao_total = int(Nnew_ao_per_atom.sum())
         if Nnew_ao_total == 0:
