@@ -149,7 +149,7 @@ To run the regression tests:
 
 ```bash
 pip install pytest
-pytest tests/test_regression.py -v
+pytest tests/test_vmc_energy.py -v
 ```
 
 Each test runs the full conversion pipeline on `examples/<system>/TAPE21.asc`
