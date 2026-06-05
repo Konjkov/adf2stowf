@@ -137,8 +137,8 @@ Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
 
 A VMC calculation with a single Slater determinant should reproduce the HF
-energy exactly. The large deviations for Be and O₃ indicate a conversion error
-that needs to be investigated and fixed.
+energy exactly. The large deviations for Be, HCN and O₃ indicate a conversion
+error that needs to be investigated and fixed.
 
 
 Testing
