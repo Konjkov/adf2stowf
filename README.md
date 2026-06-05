@@ -104,25 +104,30 @@ Accuracy
 
 HF total energies (Hartree) for HF/QZ4P/Slater calculations. **ADF** is the
 reference energy from the source file; **CASINO** is the variational Monte Carlo
-energy from the converted `stowfn.data`. The last column shows the deviation in
-units of the CASINO statistical uncertainty (σ).
+energy from the converted `stowfn.data`. The **Reference HF** column gives
+numerical Roothaan–Hartree–Fock energies from Bunge, Barrientos & Bunge,
+*Atomic Data and Nuclear Data Tables* **53**, 113 (1993)
+([doi:10.1006/adnd.1993.1003](https://doi.org/10.1006/adnd.1993.1003)),
+accurate to 8–10 significant figures, for ground-state atoms He–Xe expressed
+in a Slater-type orbital basis. The Δ/σ column shows the deviation between
+ADF and CASINO in units of the CASINO statistical uncertainty (σ).
 
 The ADF energies in the table below were obtained with this setting.
 
-| System | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
-|--------|----------------:|--------------------:|-----|
-| H      |    −0.49999985  |    −0.49999968 ± 0.00000009 | 1.9 |
-| H₂     |    −1.13359570  |    −1.13353329 ± 0.00002835 | 2.2 |
-| He     |    −2.86166638  |    −2.86169958 ± 0.00004902 | 0.7 |
-| Be     |   −14.57289824  |   −14.57210311 ± 0.00018682 | 4.3 |
-| N      |   −54.40446246  |   −54.40440785 ± 0.00044673 | 0.1 |
-| HCN    |   -92.91410391  |   -92.90146785 ± 0.00205019 | 6.2 |
-| Ne     |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
-| O₃     |  −224.36156862  |  −224.35580398 ± 0.00177555 | 3.2 |
-| Ar     |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
-| Ga     | -1923.26711963  | -1923.24957555 ± 0.01358834 | 1.3 |
-| Kr     | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
-| Xe     | −7232.13699292  | -7232.08669813 ± 0.03351053 | 1.5 |
+| System | Reference HF | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
+|--------|-------------:|----------------:|--------------------:|-----|
+| H      |              |    −0.49999985  |    −0.49999968 ± 0.00000009 | 1.9 |
+| H₂     |              |    −1.13359570  |    −1.13353329 ± 0.00002835 | 2.2 |
+| He     | -2.861679993 |    −2.86166638  |    −2.86169958 ± 0.00004902 | 0.7 |
+| Be     | -14.57302313 |   −14.57289824  |   −14.57210311 ± 0.00018682 | 4.3 |
+| N      | -54.40093415 |   −54.40446246  |   −54.40440785 ± 0.00044673 | 0.1 |
+| HCN    |              |   -92.91410391  |   -92.90146785 ± 0.00205019 | 6.2 |
+| Ne     | -128.5470980 |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
+| O₃     |              |  −224.36156862  |  −224.35580398 ± 0.00177555 | 3.2 |
+| Ar     | -526.8175122 |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
+| Ga     | -1923.261001 | -1923.26711963  | -1923.24957555 ± 0.01358834 | 1.3 |
+| Kr     | -2752.054969 | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
+| Xe     | -7232.138349 | −7232.13699292  | -7232.08669813 ± 0.03351053 | 1.5 |
 
 **Note on numerical integration accuracy.**
 ADF evaluates integrals on a numerical atom-centered grid. At the default
