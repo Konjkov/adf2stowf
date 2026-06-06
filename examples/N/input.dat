@@ -9,7 +9,7 @@ CHARGE 0 3
 UNRESTRICTED
 
 BASIS
-  Type TZ2P
+  Type QZ4P
   Core None
 END
 
