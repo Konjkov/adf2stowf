@@ -116,12 +116,12 @@ The ADF energies in the table below were obtained with this setting.
 
 | System | Reference HF | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
 |--------|-------------:|----------------:|--------------------:|-----|
-| H      |              |    −0.49999985  |    −0.49999968 ± 0.00000009 | 1.9 |
+| H      |              |    -0.49999985  |    -0.49999991 ± 0.00000010 | 0.6 |
 | H₂     |              |    −1.13359570  |    −1.13353329 ± 0.00002835 | 2.2 |
-| He     | -2.861679993 |    −2.86166638  |    −2.86169958 ± 0.00004902 | 0.7 |
-| Be     | -14.57302313 |   −14.57289824  |   −14.57210311 ± 0.00018682 | 4.3 |
-| N      | -54.40093415 |   −54.40446246  |   −54.40440785 ± 0.00044673 | 0.1 |
-| HCN    |              |   -92.91410391  |   -92.90146785 ± 0.00205019 | 6.2 |
+| He     | -2.861679993 |    -2.86159236  |    -2.86152683 ± 0.00004923 | 1.3 |
+| Be     | -14.57302313 |   -14.57283480  |   -14.57297667 ± 0.00018907 | 0.8 |
+| N      | -54.40093415 |   -54.40251620  |   -54.40104358 ± 0.00046004 | 3.2 |
+| HCN    |              |   -92.91102385  |   -92.90541795 ± 0.00197891 |     |
 | Ne     | -128.5470980 |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
 | O₃     |              |  −224.36156862  |  −224.35580398 ± 0.00177555 | 3.2 |
 | Ar     | -526.8175122 |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
@@ -137,8 +137,8 @@ Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
 
 A VMC calculation with a single Slater determinant should reproduce the HF
-energy exactly. The large deviations for Be, HCN and O₃ indicate a conversion
-error that needs to be investigated and fixed.
+energy exactly. The large deviations for O₃ indicate a conversion error that needs
+to be investigated and fixed.
 
 
 Testing
