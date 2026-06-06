@@ -11,7 +11,7 @@ CHARGE 0 0
 
 
 BASIS
-  Type QZ4P
+  Type TZ2P
   Core None
 END
 

@@ -148,18 +148,3 @@ class AdfParser:
                         f.write(f'  {key} = {{{len(value)}}}\n' + tab + f'{valstr.replace(chr(10), chr(10) + tab)}\n')
                     else:
                         f.write(f'  {key} = {valstr}\n')
-
-
-if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('Usage: adfread.py <file.asc>')
-        sys.exit(1)
-
-    ascfname = Path(sys.argv[1])
-    if ascfname.suffix != '.asc':
-        print('Error: input file must end with .asc')
-        sys.exit(1)
-
-    parser = AdfParser(ascfname)
-    parser.parse()
-    parser.write_dump(ascfname.with_suffix('.txt'))

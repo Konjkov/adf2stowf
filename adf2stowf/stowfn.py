@@ -906,8 +906,3 @@ class StoWfn:
         mat = np.eye(self.num_atorbs)
         mat[cusp_fixed_atorb, :] = -inv @ res
         return mat
-
-
-if __name__ == '__main__':
-    sto = StoWfn('stowfn.data')
-    sto.read_molorbmods('correlation.data')

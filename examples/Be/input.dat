@@ -9,15 +9,15 @@ CHARGE 0 0
 
 
 BASIS
-  Type QZ4P
+  Type TZ2P
   Core None
 END
+
+NUMERICALQUALITY excellent
 
 XC
   HartreeFock
 END
-
-NUMERICALQUALITY excellent
 
 EPRINT
   SFO NOEIG NOOVL NOORBPOP
