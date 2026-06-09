@@ -86,11 +86,14 @@ Cartesian-to-spherical conversion
 ADF computes MOs in a Cartesian basis (6 d-functions, 10 f-functions).
 CASINO requires pure spherical harmonics (5 d, 7 f). The extra Cartesian
 components are not unphysical: they are themselves Slater orbitals with the
-radial prefactor raised by r². The s-type component x²+y²+z² of a d-shell is
-an s orbital (`r²·r^order_r`), and the p-type components x·r², y·r², z·r² of
-an f-shell are p orbitals. The converter therefore represents each d/f shell
-**exactly** by appending a companion shell with `order_r + 2` and the same
-zeta (d → +s, f → +p), so no Cartesian component is lost.
+radial prefactor raised by r². Specifically:
+
+- the s-type component x²+y²+z² of a d-shell is an s-type STO with radial prefactor r<sup>n+2</sup>
+- the p-type components x·r², y·r², z·r² of an f-shell are p-type STOs with radial prefactor r<sup>n+2</sup>
+
+The converter therefore represents each d/f shell **exactly** by appending a
+companion shell with radial prefactor r<sup>n+2</sup> and the same zeta — no
+Cartesian component is lost.
 
 
 Accuracy
