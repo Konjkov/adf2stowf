@@ -37,6 +37,7 @@ class ADFToStoWF:
         self.Basis = self.data['Basis']
         self.Core = self.data['Core']
         self.Symmetry = self.data['Symmetry']
+        self.Total_Energy = self.data['Total Energy']
 
         self._parse_system()
         self.Nharmpoly_per_shelltype, self.Ncartpoly_per_shelltype, self.harm2cart_map, self.cart2harm_map = self._build_cart2harm_maps()
@@ -235,9 +236,9 @@ class ADFToStoWF:
                 elif self.core_shelltype_per_atomtype[at][s] == 3:
                     cn += [np.array([self.core_cartnorm_per_atomtype_per_shell[at][s]] * 3)]
                 elif self.core_shelltype_per_atomtype[at][s] == 4:
-                    raise ValueError('D type fixed core orbitals not yet implemented')
+                    cn += [np.array([self.core_cartnorm_per_atomtype_per_shell[at][s]] * 6)]
                 elif self.core_shelltype_per_atomtype[at][s] == 5:
-                    raise ValueError('F type fixed core orbitals not yet implemented')
+                    cn += [np.array([self.core_cartnorm_per_atomtype_per_shell[at][s]] * 10)]
                 else:
                     raise ValueError('unknown shell type')
             if len(cn) > 0:
@@ -416,9 +417,10 @@ class ADFToStoWF:
         if self.only_occupied:
             assert np.sum(self.Nvalence_molorbs) * (3 - self.Nspins) == self.Nvalence_electrons
 
+        Nvalence_harmbasfns = np.sum(self.Nvalence_harmbasfns_per_centre)
         self.cart2harm_matrix = np.zeros((self.Nharmbasfns, self.Nvalence_cartbasfn))
-        self.cart2harm_constraint = np.zeros((self.Nvalence_cartbasfn - self.Nharmbasfns, self.Nvalence_cartbasfn))
-        i, j = 0, 0
+        self.cart2harm_constraint = np.zeros((self.Nvalence_cartbasfn - Nvalence_harmbasfns, self.Nvalence_cartbasfn))
+        i, j, k = 0, 0, 0
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
             for st in self.core_shelltype_per_atomtype[at]:
@@ -430,7 +432,7 @@ class ADFToStoWF:
                 self.cart2harm_matrix[i : i + n_harm, j : j + n_cart] = self.cart2harm_map[st][:n_harm]
                 if n_cart > n_harm:
                     constraint = self.cart2harm_map[st][n_harm:]
-                    self.cart2harm_constraint[j - i : j - i + n_cart - n_harm, j : j + n_cart] = constraint
+                    self.cart2harm_constraint[j - k : j - k + n_cart - n_harm, j : j + n_cart] = constraint
                     active_spins = [sp for sp in range(self.Nspins) if self.molorb_cart_coeff[sp].shape[0] > 0]
                     if active_spins:
                         violation = sum(np.linalg.norm(constraint @ self.molorb_cart_coeff[sp][:, j : j + n_cart].T) for sp in active_spins)
@@ -441,6 +443,7 @@ class ADFToStoWF:
                             print(f'with r_order {current_order_r} and zeta: {current_zeta}')
                 i += n_harm
                 j += n_cart
+                k += n_harm
         assert i == self.Nharmbasfns
         assert j == self.Nvalence_cartbasfn
 
@@ -509,11 +512,14 @@ class ADFToStoWF:
             core_molorb_coeff          – full coefficient matrix (Nharmbasfns × Ncore_molorbs)
         """
         self.nrcorb = self.Core['nrcorb'].reshape(self.Natomtypes, 4)
+        n_harm_per_l = np.array([self.Nharmpoly_per_shelltype[st] for st in [1, 3, 4, 5]])  # [1, 3, 5, 7]
+        # ccor stores one radial coefficient per (orb, shell) - no m-components
+        # size = sum over l of nrcset[l] * nrcorb[l]
         self.ccor = self.Core['ccor']
         self.Nccor_per_atomtype = (self.nrcset * self.nrcorb).sum(axis=1)
-        assert len(self.ccor) == self.Nccor_per_atomtype.sum()
+        assert len(self.ccor) == self.Nccor_per_atomtype.sum(), f'len(ccor)={len(self.ccor)} != {self.Nccor_per_atomtype.sum()}'
         self.ccor_per_atomtype = np.array_split(self.ccor, np.cumsum(self.Nccor_per_atomtype))[:-1]
-        self.Ncoremolorbs_per_atomtype = (self.nrcorb * np.array([1, 3, 5, 7])[None, :]).sum(axis=1)
+        self.Ncoremolorbs_per_atomtype = self.nrcorb @ n_harm_per_l
         self.Ncoremolorbs_per_centre = self.Ncoremolorbs_per_atomtype[self.atyp_idx]
         self.Ncore_molorbs = self.Ncoremolorbs_per_centre.sum()
         self.core_molorb_coeff = np.zeros((self.Nharmbasfns, self.Ncore_molorbs))
@@ -565,11 +571,6 @@ class ADFToStoWF:
         the orbital (column) axis for each spin channel, producing a single
         ``coeff`` matrix of shape (Nharmbasfns, Ncore_molorbs + Nvalence_molorbs).
 
-        When ``extract_contamination_shells`` has been called, the valence
-        block may have extra rows (contamination-shell coefficients appended
-        below the spherical-harmonic rows).  Any missing rows are zero-padded
-        to Nharmbasfns so the concatenation is always well-formed.
-
         Also builds ``norm_per_harmbasfn``, the flat array of ADF Cartesian
         normalisation factors (one entry per spherical-harmonic basis function
         across all centres) used later by ``StoWfn.check_and_normalize``.
@@ -577,13 +578,9 @@ class ADFToStoWF:
         Sets attributes:
             Nmolorbs            – array of total MO counts per spin (core + valence)
             coeff               – list (per spin) of full coefficient matrices
-            norm_per_centre     – list (per atom) of concatenated core+valence norms
-            norm_per_harmbasfn  – flat norm array over all basis functions
         """
         self.Nmolorbs = np.array([self.Ncore_molorbs + self.Nvalence_molorbs[sp] for sp in range(self.Nspins)])
         self.coeff = [np.concatenate([self.core_molorb_coeff, self.valence_molorb_harm_coeff[sp]], axis=1) for sp in range(self.Nspins)]
-        self.norm_per_centre = [np.concatenate([self.core_cartnorm_per_atomtype[at], self.valence_cartnorm_per_atomtype[at]]) for at in self.atyp_idx]
-        self.norm_per_harmbasfn = np.concatenate(self.norm_per_centre)
 
     def setup_stowfn(self):
         """Populate a StoWfn object with geometry, basis, and MO data.
@@ -608,24 +605,15 @@ class ADFToStoWF:
         self.sto.code = 'ADF'
         self.sto.periodicity = 0
         self.sto.spin_unrestricted = not self.spin_restricted
-        self.sto.nuclear_repulsion_energy = 0.0
         self.sto.atomcharge = self.total_charge_per_atomtype[self.atyp_idx]
         assert len(self.sto.atomcharge) == self.Natoms
-        eionion = 0.0
+        self.sto.nuclear_repulsion_energy = 0.0
         if self.Natoms > 1:
-            adist = self.Geometry['Atomic Distances'].reshape(self.Natoms + 1, self.Natoms + 1)[1:, 1:]
-            for i in range(self.Natoms):
-                assert adist[i, i] == 0.0
-                for j in range(i):
-                    assert adist[i, j] == adist[j, i]
-                    assert adist[i, j] > 0.0
-                    eionion += self.sto.atomcharge[i] * self.sto.atomcharge[j] / adist[i, j]
-            self.sto.nuclear_repulsion_energy = eionion / self.Natoms
+            self.sto.nuclear_repulsion_energy = self.Total_Energy['Nuclear repulsion energy'][0] / self.Natoms
         self.sto.num_elec = self.Nvalence_electrons + 2 * self.Ncore_molorbs
-        self.sto.atompos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
+        self.sto.atompos = self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
         self.sto.atomnum = self.atomicnumber_per_atomtype[self.atyp_idx]
-        self.sto.num_centres = int(self.Natoms)
-        self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
+        self.sto.num_centres = self.Natoms
         self.sto.num_shells = np.sum(self.Nshells_per_centre)
         self.sto.idx_first_shell_on_centre = np.array([0] + list(np.cumsum(self.Nshells_per_centre)))
         self.sto.shelltype = np.concatenate(self.shelltype_per_centre)
