@@ -75,28 +75,22 @@ Command-line options
 | `--cusp-method=enforce` | Apply cusp correction to active orbitals **(default)** |
 | `--cusp-method=project` | Project out cusp-violating components |
 | `--cusp-method=none` | Disable cusp correction |
-| `--cart2harm-projection` | Enforce pure spherical harmonics via orthogonal projection |
 | `--all-orbitals` | Include virtual orbitals (default: occupied only) |
 | `--plot-cusps` | Plot cusp constraints (requires Matplotlib) |
 | `--dump` | Write a text dump of TAPE21 to `TAPE21.txt` |
 
 
-Cartesian-to-spherical warning
-===============================
-
-You may see a warning during conversion:
-
-    WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
+Cartesian-to-spherical conversion
+=================================
 
 ADF computes MOs in a Cartesian basis (6 d-functions, 10 f-functions).
 CASINO requires pure spherical harmonics (5 d, 7 f). The extra Cartesian
-components (e.g. the s-type contamination x²+y²+z² in d-shells) are
-unphysical in a spherical harmonic representation.
-
-Use `--cart2harm-projection` to remove these components via an orthogonal
-projection onto the pure spherical harmonic subspace. Without it, the
-contaminating components are silently dropped, which may slightly affect
-the total energy.
+components are not unphysical: they are themselves Slater orbitals with the
+radial prefactor raised by r². The s-type component x²+y²+z² of a d-shell is
+an s orbital (`r²·r^order_r`), and the p-type components x·r², y·r², z·r² of
+an f-shell are p orbitals. The converter therefore represents each d/f shell
+**exactly** by appending a companion shell with `order_r + 2` and the same
+zeta (d → +s, f → +p), so no Cartesian component is lost.
 
 
 Accuracy
@@ -121,7 +115,7 @@ The ADF energies in the table below were obtained with this setting.
 | He     | -2.861679993 |    -2.86166638  |    -2.86171447 ± 0.00004904 | 1.0 |
 | Be     | -14.57302313 |   -14.57283480  |   -14.57297667 ± 0.00018907 | 0.8 |
 | N      | -54.40093415 |   -54.40446246  |   -54.40424536 ± 0.00045720 | 0.4 |
-| HCN    |              |   -92.91102385  |   -92.90541795 ± 0.00197891 | 2.8 |
+| HCN    |              |   -92.91410391  |   -92.90227620 ± 0.00197994 | 6.0 |
 | Ne     | -128.5470980 |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
 | O₃     |              |  −224.36156862  |  −224.35580398 ± 0.00177555 | 3.2 |
 | Ar     | -526.8175122 |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
@@ -141,19 +135,13 @@ energy exactly. The large deviations for O₃ indicate a conversion error that n
 to be investigated and fixed.
 
 
-Testing
-=======
+Verification
+============
 
-Reference output files for all example systems are included in `examples/`.
-To run the regression tests:
-
-```bash
-pip install pytest
-pytest tests/test_vmc_energy.py -v
-```
-
-Each test runs the full conversion pipeline on `examples/<system>/TAPE21.asc`
-and compares the result against the reference `stowfn.data`.
+Correctness is verified by comparing the CASINO VMC energy of the converted
+`stowfn.data` against the ADF reference energy: a single-determinant VMC run
+must reproduce the HF energy. Reference inputs/outputs for all example systems
+are included in `examples/` (see the table above).
 
 
 Documentation

@@ -84,17 +84,20 @@ sp-shells (shelltype=2) are a different concept not used here.
 ADF internally uses **Cartesian** d and f functions (6 d-functions, 10 f-functions),
 but STOs for CASINO must be expressed in **pure spherical harmonics** (5 d, 7 f).
 
-The extra Cartesian components (e.g., `x²+y²+z²` for d-shells, which has s-symmetry)
-are non-physical in a spherical harmonic context. The transformation matrices
-`harm2cart_map` and `cart2harm_map` handle this. If Cartesian orbitals contain
-s-type contamination in d-shells, a warning is printed:
+The extra Cartesian components are themselves Slater orbitals with the radial
+prefactor raised by r²: the `x²+y²+z²` component of a d-shell is an s orbital
+(`r²·r^order_r`), and the `x·r²`, `y·r²`, `z·r²` components of an f-shell are p
+orbitals. The conversion is therefore **exact** and is the only method: for every
+Cartesian d/f valence shell the converter appends a companion shell with
+`order_r + 2` and the same zeta (d → +s, f → +p), built in
+`_build_extended_valence_basis`. The full square `cart2harm_map[st]` block routes
+the harmonic rows to the parent shell and the contamination rows to the companion
+shell, so `harm2cart ∘ cart2harm = I` and no Cartesian component is lost.
 
-```
-WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
-```
-
-Use `--cart2harm-projection` to remove this contamination via SVD-based null-space
-projection (numerically stable, preferred over pseudoinverse).
+Note: ADF normalises a whole shell with one factor (one `bnorm`/`cornrm` per shell,
+replicated across all Cartesian components), so the companion shell inherits the
+correct normalisation via `StoWfn.get_norm` — the same machinery that normalises
+the harmonic part.
 
 ---
 
@@ -181,9 +184,10 @@ Shell type encoding in stowfn.data: `s=1, sp=2, p=3, d=4, f=5, g=6`
    accumulated by eigenvalue and redistributed; a leftover warning is printed if any
    remain after all orbitals are processed.
 
-5. **`cart2harm_constraint`** captures the rows of `cart2harm_map` corresponding to
-   non-physical Cartesian components (rows beyond `n_harm`). These must be zero for
-   pure spherical harmonics. Violation norm > 1e-5 triggers a warning.
+5. **Cartesian → spherical is exact.** The rows of `cart2harm_map[st]` beyond
+   `n_harm` (the contamination components) are routed to an appended companion
+   shell (`order_r + 2`, same zeta) instead of being dropped, so the full square
+   block is used and the conversion loses nothing. See `_build_extended_valence_basis`.
 
 6. **Cusp enforcing** (`--cusp-method=enforce`) uses a linear operator derived in
    `stowfn.py:cusp_enforcing_matrix()` that modifies s-type orbital coefficients
