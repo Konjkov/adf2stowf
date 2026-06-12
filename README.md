@@ -21,6 +21,10 @@ high-accuracy QMC calculations.
 For general information about ADF, see https://www.scm.com/
 For CASINO, see https://vallico.net/casinoqmc/
 
+For an example of using ADF as a source of orbitals for all-electron QMC, see
+Nemec, Towler & Needs, *Benchmark all-electron ab initio quantum Monte Carlo
+calculations for small molecules* ([arXiv:0908.2041](https://arxiv.org/pdf/0908.2041)).
+
 
 Requirements
 ============
@@ -72,12 +76,19 @@ Command-line options
 
 | Option | Description |
 |--------|-------------|
-| `--cusp-method=enforce` | Apply cusp correction to active orbitals **(default)** |
-| `--cusp-method=project` | Project out cusp-violating components |
+| `--cusp-method=project` | Project out cusp-violating components **(default)** |
+| `--cusp-method=enforce` | Apply cusp correction to active orbitals |
 | `--cusp-method=none` | Disable cusp correction |
 | `--all-orbitals` | Include virtual orbitals (default: occupied only) |
 | `--plot-cusps` | Plot cusp constraints (requires Matplotlib) |
 | `--dump` | Write a text dump of TAPE21 to `TAPE21.txt` |
+
+By default (`project`) the converter removes the cusp-violating components of
+each orbital so the wavefunction satisfies the nuclear cusp condition. When an
+orbital's relative cusp deviation `|ψ'(0)/ψ(0) + Z| / Z` is too large to be
+repaired — typically a delocalized molecular orbital that leaves a wrong-slope
+tail on a neighbouring nucleus — the converter prints a warning advising you to
+choose a different basis set for that atom.
 
 
 Cartesian-to-spherical conversion
@@ -111,20 +122,22 @@ ADF and CASINO in units of the CASINO statistical uncertainty (σ).
 
 The ADF energies in the table below were obtained with this setting.
 
-| System | Reference HF | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
-|--------|-------------:|----------------:|--------------------:|-----|
-| H      |              |    -0.49999985  |    -0.49999991 ± 0.00000010 | 0.6 |
-| H₂     |              |    −1.13359570  |    −1.13353329 ± 0.00002835 | 2.2 |
-| He     | -2.861679993 |    -2.86166638  |    -2.86171447 ± 0.00004904 | 1.0 |
-| Be     | -14.57302313 |   -14.57283480  |   -14.57297667 ± 0.00018907 | 0.8 |
-| N      | -54.40093415 |   -54.40446246  |   -54.40424536 ± 0.00045720 | 0.4 |
-| HCN    |              |   -92.91410391  |   -92.90227620 ± 0.00197994 | 6.0 |
-| Ne     | -128.5470980 |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
-| O₃     |              |  −224.36156862  |  -224.35514874 ± 0.00298899 | 2.1 |
-| Ar     | -526.8175122 |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
-| Ga     | -1923.261001 | -1923.26711963  | -1923.27528491 ± 0.01268924 | 0.6 |
-| Kr     | -2752.054969 | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
-| Xe     | -7232.138349 | −7232.13699292  | -7232.08669813 ± 0.03351053 | 1.5 |
+| System | Reference HF | ADF (HF energy) | ADF (basis) | CASINO (VMC energy) | Δ/σ |
+|--------|-------------:|----------------:|:-----------:|--------------------:|-----|
+| H      |              |    -0.49999985  | QZ4P |    -0.49999980 ± 0.00000010 | 0.5 |
+| H₂     |              |    −1.13359570  | QZ4P |    -1.13357687 ± 0.00002833 | 0.7 |
+| He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86169385 ± 0.00004882 | 0.6 |
+| Be     | -14.57302313 |   -14.57283480  | TZ2P |   -14.57295669 ± 0.00018837 | 0.6 |
+| B      | -24.52906069 |   -24.53144626  | TZ2P |   -24.53056844 ± 0.00026590 | 3.3 |
+| C      | -37.68861890 |   -37.69220398  | TZ2P |   -37.69026394 ± 0.00033158 | 5.9 |
+| N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40427971 ± 0.00045321 | 0.4 |
+| HCN    |              |   -92.91410391  | QZ4P |   -92.90227620 ± 0.00197994 | 6.0 | -
+| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  −128.54704358 ± 0.00071620 | 0.2 | -
+| O₃     |              |  −224.36156862  | QZ4P |  -224.35514874 ± 0.00298899 | 2.1 | -
+| Ar     | -526.8175122 |  −526.81670427  | QZ4P |  −526.81634824 ± 0.00198243 | 0.2 | -
+| Ga     | -1923.261001 | -1923.26303777  | QZ4P | -1923.28230448 ± 0.01321398 | 1.5 | -
+| Kr     | -2752.054969 | −2752.05365745  | QZ4P | −2752.06972157 ± 0.01671619 | 1.0 | -
+| Xe     | -7232.138349 | −7232.13699292  | QZ4P | -7232.08669813 ± 0.03351053 | 1.5 | -
 
 **Note on numerical integration accuracy.**
 ADF evaluates integrals on a numerical atom-centered grid. At the default
@@ -133,8 +146,8 @@ the ADF total energy an unreliable reference for sub-mHa comparisons with CASINO
 Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
 
-A VMC calculation with a single Slater determinant should reproduce the HF
-energy exactly. The large deviations for O₃ indicate a conversion error that needs
+A VMC calculation with a single Slater determinant should reproduce the HF energy
+exactly. The large deviations for HCN and O₃ indicate a conversion error that needs
 to be investigated and fixed.
 
 

@@ -426,8 +426,8 @@ Command-line interface
      - Save ``cusp_constraint.svg`` with wavefunction values and local
        energies along the z-axis through each nucleus before and after
        cusp correction.
-   * - ``--cusp-method {enforce,project,none}``
-     - ``enforce``
+   * - ``--cusp-method {project,enforce,none}``
+     - ``project``
      - Nuclear cusp correction strategy (see :meth:`apply_cusp_correction`).
    * - ``--cart2harm-projection``
      - ``False``
@@ -495,7 +495,7 @@ Usage examples
 
    conv = adf2stowf.ADFToStoWF(
        plot_cusps=False,
-       cusp_method='enforce',
+       cusp_method='project',
        do_dump=False,
        cart2harm_projection=True,
        only_occupied=True,

@@ -33,21 +33,26 @@ Command-Line Options
 
 .. option:: adf2stowf
 
-    Run with defaults (equivalent to ``--cusp-method=enforce``).
-
-.. option:: --cusp-method=enforce
-
-    Apply cusp correction to active orbitals. **Default.**
-    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
+    Run with defaults (equivalent to ``--cusp-method=project``).
 
 .. option:: --cusp-method=project
 
-    Project out cusp-violating components from each orbital.
+    Project out cusp-violating components from each orbital. **Default.**
+    When an orbital's relative cusp deviation ``|psi'(0)/psi(0) + Z| / Z`` is
+    too large to be repaired (typically a delocalized molecular orbital with a
+    wrong-slope tail on a neighbouring nucleus), the converter warns that a
+    different basis set should be chosen for that atom.
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
+
+.. option:: --cusp-method=enforce
+
+    Apply cusp correction to active orbitals.
     See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --cusp-method=none
 
     Disable cusp correction entirely.
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --plot-cusps
 

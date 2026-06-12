@@ -9,7 +9,7 @@ CHARGE 0 0
 
 
 BASIS
-  Type QZ4P
+  Type ET/ET-pVQZ
   Core None
 END
 

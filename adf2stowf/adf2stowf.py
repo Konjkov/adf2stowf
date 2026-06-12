@@ -639,6 +639,31 @@ class ADFToStoWF:
         cusp_enforcing = self.sto.cusp_enforcing_matrix()
         print('Molorb values at nuclei before applying cusp constraint:')
         print(self.sto.eval_molorbs(self.sto.atompos.T))
+        # Warn per atom when the basis cannot represent the nuclear cusp: the
+        # relative deviation |psi'(0)/psi(0) + Z| / Z of an orbital that has a
+        # non-negligible amplitude at the nucleus is too large to repair.  This
+        # stays small for every atom (the cusp is over-steep but representable)
+        # and only blows up for delocalized molecular orbitals leaving a
+        # wrong-slope tail on a neighbouring nucleus, signalling that a
+        # different basis set should be chosen for that atom.
+        cusp_deviation_limit = 0.02
+        molvals = [self.sto.eval_molorbs(self.sto.centrepos.T, spin=sp) for sp in range(self.Nspins)]
+        for core in range(self.sto.num_centres):
+            Z = self.sto.atomcharge[core]
+            worst = 0.0
+            for sp in range(self.Nspins):
+                psi0 = molvals[sp][core]
+                violation = cusp_constraint[core] @ self.coeff[sp]
+                for i in range(self.Nmolorbs[sp]):
+                    if abs(psi0[i]) < 1e-3:
+                        continue
+                    worst = max(worst, abs(violation[i] / psi0[i]) / Z)
+            if worst > cusp_deviation_limit:
+                print(
+                    f'WARNING: nuclear cusp at centre {core + 1} (Z={Z:.0f}) deviates by '
+                    f'{worst:.3f}; the basis cannot represent the cusp at this atom — '
+                    f'choose a different basis set for it'
+                )
         self.fixed = [np.zeros(self.Nmolorbs[sp], bool) for sp in range(self.Nspins)]
         for sp in range(self.Nspins):
             for i in range(self.Nmolorbs[sp]):
@@ -786,14 +811,14 @@ def main():
         description='Convert ADF TAPE21.asc to CASINO stowfn.data',
         epilog="""
         Examples:
-          %(prog)s                              # use default: --cusp-method=enforce
+          %(prog)s                              # use default: --cusp-method=project
           %(prog)s --plot-cusps                 # enable cusp plotting
-          %(prog)s --cusp-method=enforce        # apply transformation to satisfy cusps (default)
-          %(prog)s --cusp-method=project        # project out cusp-violating components
+          %(prog)s --cusp-method=project        # project out cusp-violating components (default)
+          %(prog)s --cusp-method=enforce        # apply transformation to satisfy cusps
           %(prog)s --cusp-method=none           # disable any cusp correction
           %(prog)s --dump                       # generate a text dump of the parsed data
           %(prog)s --all-orbitals               # include also virtual orbitals (default: only occupied)
-          %(prog)s --cusp-method=project --dump
+          %(prog)s --cusp-method=none --dump
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -805,11 +830,11 @@ def main():
     parser.add_argument(
         '--cusp-method',
         choices=['enforce', 'project', 'none'],
-        default='enforce',
+        default='project',
         help="""
             Choose how to handle nuclear cusp conditions:
-            - enforce  : apply linear transformation to satisfy cusps (default)
-            - project  : remove components that violate cusp conditions via projection
+            - project  : remove components that violate cusp conditions via projection (default)
+            - enforce  : apply linear transformation to satisfy cusps
             - none     : do not apply any cusp correction
         """.strip(),
     )
