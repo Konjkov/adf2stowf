@@ -106,6 +106,16 @@ The converter therefore represents each d/f shell **exactly** by appending a
 companion shell with radial prefactor r<sup>n+2</sup> and the same zeta — no
 Cartesian component is lost.
 
+A subtlety of this transformation is normalisation: ADF MO coefficients refer
+to individually normalised Cartesian monomials (the `bnorm` factors stored in
+TAPE21), while CASINO expects coefficients of its own normalised real
+harmonics. Within a d or f shell these norms differ between components, so the
+polynomial transformation is conjugated by them,
+`diag(1/casino_norm) · cart2harm · diag(bnorm)`. Omitting this conjugation
+distorts molecular orbitals that mix d/f with s/p functions — invisible for
+isolated atoms (closed and half-filled subshells are unitary-invariant) but
+worth several mHa in molecules such as HCN or O₃.
+
 
 Accuracy
 ========
@@ -125,15 +135,16 @@ The ADF energies in the table below were obtained with this setting.
 | System | Reference HF | ADF (HF energy) | ADF (basis) | CASINO (VMC energy) | Δ/σ |
 |--------|-------------:|----------------:|:-----------:|--------------------:|-----|
 | H      |              |    -0.49999985  | QZ4P |    -0.49999980 ± 0.00000010 | 0.5 |
-| H₂     |              |    −1.13359570  | QZ4P |    -1.13357687 ± 0.00002833 | 0.7 |
+| H₂     |              |    −1.13359570  | QZ4P |    -1.13358954 ± 0.00002846 | 0.2 |
 | He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86169385 ± 0.00004882 | 0.6 |
-| Be     | -14.57302313 |   -14.57283480  | TZ2P |   -14.57295669 ± 0.00018837 | 0.6 |
-| B      | -24.52906069 |   -24.53144626  | TZ2P |   -24.53056844 ± 0.00026590 | 3.3 |
-| C      | -37.68861890 |   -37.69220398  | TZ2P |   -37.69026394 ± 0.00033158 | 5.9 |
+| Be     | -14.57302313 |   -14.57283976  | pVQZ |   -14.57293719 ± 0.00018836 | 0.5 |
+| B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53249860 ± 0.00026657 | 0.8 |
+| C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69320143 ± 0.00033374 | 0.1 |
 | N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40427971 ± 0.00045321 | 0.4 |
-| HCN    |              |   -92.91410391  | QZ4P |   -92.90227620 ± 0.00197994 | 6.0 | -
-| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  −128.54704358 ± 0.00071620 | 0.2 | -
-| O₃     |              |  −224.36156862  | QZ4P |  -224.35514874 ± 0.00298899 | 2.1 | -
+| CN⁻    |              |   -92.34646280  | pVQZ |   -92.34759147 ± 0.00198945 | 0.6 |
+| HCN    |              |   -92.91263786  | mix  |   -92.91135962 ± 0.00199204 | 0.6 |
+| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  -128.54622880 ± 0.00070284 | 0.9 |
+| O₃     |              |  −224.36156862  | QZ4P |  -224.35855897 ± 0.00303037 | 1.0 | -
 | Ar     | -526.8175122 |  −526.81670427  | QZ4P |  −526.81634824 ± 0.00198243 | 0.2 | -
 | Ga     | -1923.261001 | -1923.26303777  | QZ4P | -1923.28230448 ± 0.01321398 | 1.5 | -
 | Kr     | -2752.054969 | −2752.05365745  | QZ4P | −2752.06972157 ± 0.01671619 | 1.0 | -
@@ -147,8 +158,7 @@ Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
 
 A VMC calculation with a single Slater determinant should reproduce the HF energy
-exactly. The large deviations for HCN and O₃ indicate a conversion error that needs
-to be investigated and fixed.
+exactly; all systems in the table agree within statistics.
 
 
 Verification

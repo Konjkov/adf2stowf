@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
 
 import argparse
+from math import factorial
 
 import numpy as np
 
 from adf2stowf import adfread, stowfn
+
+# Output (spherical-harmonic + contamination) polynomial norms per d/f shelltype,
+# matching StoWfn.get_norm ordering: d -> [xy, yz, zx, 3zz-r2, xx-yy, s-contam],
+# f -> [7 f-harmonics, px, py, pz contaminants].
+_PI = np.pi
+_PN_OUT = {
+    4: np.array([0.5 * np.sqrt(15 / _PI), 0.5 * np.sqrt(15 / _PI), 0.5 * np.sqrt(15 / _PI),
+                 0.25 * np.sqrt(5 / _PI), 0.25 * np.sqrt(15 / _PI), np.sqrt(1 / (4 * _PI))]),
+    5: np.array([0.25 * np.sqrt(7 / _PI), 0.25 * np.sqrt(10.5 / _PI), 0.25 * np.sqrt(10.5 / _PI),
+                 0.25 * np.sqrt(105 / _PI), 0.5 * np.sqrt(105 / _PI), 0.25 * np.sqrt(17.5 / _PI), 0.25 * np.sqrt(17.5 / _PI),
+                 np.sqrt(3 / (4 * _PI)), np.sqrt(3 / (4 * _PI)), np.sqrt(3 / (4 * _PI))]),
+}  # fmt: skip
+_L_OUT = {4: 2, 5: 3}
 
 np.set_printoptions(
     suppress=True,
@@ -449,14 +463,31 @@ class ADFToStoWF:
         i, j = 0, 0
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
+            bn_off = 0
             for st in self.core_shelltype_per_atomtype[at]:
                 i += self.Nharmpoly_per_shelltype[st]
             for shell in range(self.Nvalence_shells_per_atomtype[at]):
                 st = self.valence_shelltype_per_atomtype[at][shell]
                 n_cart = self.Ncartpoly_per_shelltype[st]
+                bnorm = self.valence_cartnorm_per_atomtype[at][bn_off : bn_off + n_cart]
+                bn_off += n_cart
                 # Full square block: harmonic rows followed by contamination rows,
                 # the latter landing on the appended contamination shell.
-                self.cart2harm_matrix[i : i + n_cart, j : j + n_cart] = self.cart2harm_map[st]
+                if st in _PN_OUT:
+                    # ADF basis functions are bnorm-normalised Cartesian monomials
+                    # (TAPE21 kx/ky/kz/kr); CASINO expects coefficients of get_norm-
+                    # normalised harmonics. For d/f the norms differ within a shell,
+                    # so the bare-polynomial map must be conjugated by them. The
+                    # radial factor is shared by parent and contamination rows
+                    # (same n = l + order_r + 1), so the conjugation is purely angular.
+                    zeta = self.valence_zeta_per_atomtype[at][shell]
+                    order_r = self.valence_order_r_per_atomtype[at][shell]
+                    n = _L_OUT[st] + order_r + 1
+                    gn = _PN_OUT[st] * (2 * zeta) ** n * np.sqrt(2 * zeta / factorial(2 * n))
+                    block = self.cart2harm_map[st] * bnorm[None, :] / gn[:, None]
+                else:
+                    block = self.cart2harm_map[st]
+                self.cart2harm_matrix[i : i + n_cart, j : j + n_cart] = block
                 i += n_cart
                 j += n_cart
         assert i == self.Nharmbasfns

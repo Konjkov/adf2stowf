@@ -29,6 +29,25 @@ adf2stowf                  →   stowfn.data (CASINO input)
 
 ---
 
+## Working agreement (division of labor)
+
+**Claude edits the source only. The user deploys and verifies.**
+
+- Claude's job: edit `adf2stowf/*.py` (the source tree), reason about the change, and
+  run **in-process checks of individual functions** (import the module, call methods, and
+  inspect intermediate quantities — matrices, weights, identities — as in scratch scripts).
+- The user's job: deploy the source to the test environment, regenerate `stowfn.data`
+  for the example systems, run CASINO, and report the energies.
+- Do **not** generate/overwrite the project's `stowfn.data` fixtures, reinstall the
+  package, or launch CASINO. CASINO VMC energy vs the ADF HF reference is the ground
+  truth; Claude's in-process numerical models are aids only and have been wrong before.
+- Verification protocol: test the cheapest discriminating system first (e.g. an atom with
+  occupied d such as **Ga**); if its energy is wrong, stop — do not test the rest.
+- Note: the venv may hold a stale non-editable copy at `site-packages/adf2stowf/` that
+  shadows the source. Deployment is the user's responsibility.
+
+---
+
 ## Physics Background
 
 ### Slater-Type Orbitals (STO)
