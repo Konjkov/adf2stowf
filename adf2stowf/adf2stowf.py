@@ -634,7 +634,7 @@ class ADFToStoWF:
         self.sto.zeta = np.concatenate(self.zeta_per_centre)
         self.sto.num_atorbs = self.Nharmbasfns
         self.sto.num_molorbs = self.Nmolorbs
-        self.sto.footer = ''
+        self.sto.footer = []
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
@@ -725,12 +725,12 @@ class ADFToStoWF:
             offset = np.zeros((3, self.z.size))
             offset[2, :] = self.z
             # Create r with shape (self.sto.num_atom, 3, self.z.size)
-            r = self.sto.atompos[:, :, None] + offset[None, :, :]
+            self.r = self.sto.atompos[:, :, None] + offset[None, :, :]
             self.val_pre = [
-                [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
+                [self.sto.eval_molorbs(self.r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
             ]
             self.lap_pre = [
-                [self.sto.eval_molorb_derivs(r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
+                [self.sto.eval_molorb_derivs(self.r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
                 for atom in range(self.sto.num_atom)
             ]
 
@@ -739,10 +739,10 @@ class ADFToStoWF:
 
         if self.do_plot_cusps:
             self.val_post = [
-                [self.sto.eval_molorbs(r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
+                [self.sto.eval_molorbs(self.r[atom], spin=sp)[:, self.fixed[sp]] for sp in range(self.Nspins)] for atom in range(self.sto.num_atom)
             ]
             self.lap_post = [
-                [self.sto.eval_molorb_derivs(r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
+                [self.sto.eval_molorb_derivs(self.r[atom], spin=sp)[2][:, self.fixed[sp]] for sp in range(self.Nspins)]
                 for atom in range(self.sto.num_atom)
             ]
 
