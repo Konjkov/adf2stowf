@@ -113,10 +113,19 @@ Cartesian d/f valence shell the converter appends a companion shell with
 the harmonic rows to the parent shell and the contamination rows to the companion
 shell, so `harm2cart ∘ cart2harm = I` and no Cartesian component is lost.
 
-Note: ADF normalises a whole shell with one factor (one `bnorm`/`cornrm` per shell,
-replicated across all Cartesian components), so the companion shell inherits the
-correct normalisation via `StoWfn.get_norm` — the same machinery that normalises
-the harmonic part.
+Normalisation (important): ADF stores MO coefficients relative to **individually
+normalised Cartesian monomials** — `bnorm` is **per basis function, not per shell**
+(within a d/f shell the components differ, e.g. `xy` vs `xx` by √3). CASINO instead
+wants coefficients of its own `get_norm`-normalised real harmonics. So the bare
+polynomial map must be conjugated by both norms: the d/f block in
+`process_coefficients` is `diag(1/get_norm) · cart2harm_map[st] · diag(bnorm)`
+(the radial factor cancels between parent and contamination rows, since they share
+`n = l + order_r + 1`, so the conjugation is purely angular). For s/p this reduces
+to the identity (`bnorm == get_norm`, one component per shell), which is why
+omitting it was invisible for s/p and for spherical atoms (closed/half-filled
+subshells are unitary-invariant) but distorted molecular d/f-bearing MOs by several
+mHa (HCN, CN⁻, O₃). Do **not** transpose `cart2harm_map[st]` in this block — a
+spurious `.T` passes a self-cancelling "identity check" yet destroys the orbitals.
 
 ---
 

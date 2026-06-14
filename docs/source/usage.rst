@@ -63,32 +63,23 @@ Command-Line Options
     Include virtual orbitals in addition to occupied ones.
     Default: occupied orbitals only.
 
-.. option:: --cart2harm-projection
-
-    Enforce pure spherical harmonics via orthogonal projection.
-    See :ref:`cart-to-harm` in the :doc:`adf2stowf` module documentation.
-
 .. option:: --dump
 
     Generate a text dump of ``TAPE21.asc``.
+
+The Cartesian-to-spherical conversion itself is exact (no components are
+discarded; see :ref:`cart-to-harm`), so it emits no warnings.
 
 Warnings
 --------
 
 You may see a warning like::
 
-    WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
+    WARNING: nuclear cusp at centre 1 (Z=6) deviates by 3.014; the basis cannot represent the cusp at this atom — choose a different basis set for it
 
-This means the molecular orbitals (computed in a Cartesian Gaussian basis) contain
-non-spherical components — for example, s-type contamination (:math:`x^2+y^2+z^2`)
-in d- or f-shells. These components violate angular momentum purity and are unphysical
-in a spherical harmonic representation.
-
-To eliminate this warning, use ``--cart2harm-projection``. This applies an orthogonal
-projection that removes all constraint-violating components.
-
-.. note::
-
-    Even after projection the total energy may not match the original Cartesian-basis
-    energy, because unphysical (but energetically stabilizing) components are removed
-    without fully reconstructing the wavefunction in the pure spherical basis.
+This is a nuclear-cusp diagnostic, not a conversion error.  An orbital with a
+non-negligible amplitude at the nucleus has a relative cusp deviation
+``|psi'(0)/psi(0) + Z| / Z`` too large to repair — typically a delocalized
+molecular orbital leaving a wrong-slope tail on a neighbouring nucleus.  It
+signals that a different (better cusp-representing) basis set should be chosen
+for that atom; it does not indicate a bug in the conversion.
