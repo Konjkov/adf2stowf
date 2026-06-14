@@ -72,3 +72,11 @@ picks up a smooth background from the tails of basis functions centred on
 neighbouring atoms, so the residual cusp deviation reported during conversion
 can stay large without affecting the variational energy: a single-determinant
 VMC run still reproduces the HF energy.
+
+Unused basis functions are pruned.  Any shell — of any angular momentum
+(s, p, d, or f), including the appended companion shells — whose coefficients
+are zero in every written orbital is omitted from ``stowfn.data``.  These are
+typically the polarisation d/f functions and diffuse s/p functions that no
+occupied orbital uses; dropping them leaves the wavefunction unchanged while
+reducing the number of basis functions CASINO must evaluate.  Use
+``--all-orbitals`` to keep them, since the virtual orbitals make use of them.

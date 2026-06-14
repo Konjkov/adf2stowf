@@ -116,6 +116,15 @@ distorts molecular orbitals that mix d/f with s/p functions — invisible for
 isolated atoms (closed and half-filled subshells are unitary-invariant) but
 worth several mHa in molecules such as HCN or O₃.
 
+Unused basis functions are pruned. Any shell — of any angular momentum
+(s, p, d, or f), including the appended companion shells — whose coefficients
+are zero in every written orbital is omitted from `stowfn.data`. These are
+typically the polarisation d/f functions and diffuse s/p functions that no
+occupied orbital uses; dropping them leaves the wavefunction unchanged while
+reducing the number of basis functions CASINO must evaluate (for atoms this
+can roughly halve the AO count). Pass `--all-orbitals` to keep them — the
+virtual orbitals make use of them.
+
 
 Accuracy
 ========
@@ -134,16 +143,16 @@ The ADF energies in the table below were obtained with this setting.
 
 | System | Reference HF | ADF (HF energy) | ADF (basis) | CASINO (VMC energy) | Δ/σ |
 |--------|-------------:|----------------:|:-----------:|--------------------:|-----|
-| H      |              |    -0.49999985  | QZ4P |    -0.49999980 ± 0.00000010 | 0.5 |
-| H₂     |              |    −1.13359570  | QZ4P |    -1.13358954 ± 0.00002846 | 0.2 |
-| He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86169385 ± 0.00004882 | 0.6 |
-| Be     | -14.57302313 |   -14.57283976  | pVQZ |   -14.57293719 ± 0.00018836 | 0.5 |
-| B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53249860 ± 0.00026657 | 0.8 |
-| C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69320143 ± 0.00033374 | 0.1 |
-| N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40427971 ± 0.00045321 | 0.4 |
+| H      |              |    -0.49999985  | QZ4P |    -0.49999978 ± 0.00000010 | 0.7 |
+| H₂     |              |    −1.13359570  | QZ4P |    -1.13361741 ± 0.00002854 | 0.8 |
+| He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86167262 ± 0.00004938 | 0.1 |
+| Be     | -14.57302313 |   -14.57283976  | pVQZ |   -14.57296092 ± 0.00018621 | 0.7 |
+| B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53237642 ± 0.00026530 | 1.3 |
+| C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69272708 ± 0.00032775 | 1.6 |
+| N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40400724 ± 0.00044476 | 1.0 |
 | CN⁻    |              |   -92.34646280  | pVQZ |   -92.34759147 ± 0.00198945 | 0.6 |
 | HCN    |              |   -92.91263786  | mix  |   -92.91135962 ± 0.00199204 | 0.6 |
-| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  -128.54622880 ± 0.00070284 | 0.9 |
+| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  -128.54608391 ± 0.00071618 | 1.1 |
 | O₃     |              |  −224.36156862  | QZ4P |  -224.36002637 ± 0.00302534 | 0.5 |
 | Ar     | -526.8175122 |  −526.81670427  | QZ4P |  -526.82031259 ± 0.00197973 | 1.8 |
 | Ga     | -1923.261001 | -1923.26303777  | QZ4P | -1923.24905423 ± 0.01358497 | 1.0 |

@@ -308,6 +308,21 @@ ADFToStoWF class
       ``(Nharmbasfns, Nmolorbs[spin])`` and is ready to be passed to
       :class:`stowfn.StoWfn`.
 
+   .. method:: prune_empty_shells()
+
+      Drop shells that carry no weight in any written MO.
+
+      Any shell — of any angular momentum, including the appended companion
+      shells — whose coefficients are zero (below ``1e-10``) in every written
+      orbital is removed from :attr:`shelltype_per_centre`,
+      :attr:`order_r_per_centre`, :attr:`zeta_per_centre`, and the
+      corresponding rows of :attr:`coeff`; :attr:`Nshells_per_centre` and
+      ``Nharmbasfns`` are updated accordingly.  These are typically the
+      polarisation d/f functions and diffuse s/p functions that no occupied
+      orbital uses (with ``--all-orbitals`` the virtual orbitals keep them
+      alive).  Runs before the cusp correction, while the unused coefficients
+      are still exact zeros, and leaves the wavefunction unchanged.
+
    .. method:: setup_stowfn()
 
       Construct and populate a :class:`stowfn.StoWfn` object from all
@@ -380,9 +395,10 @@ ADFToStoWF class
       4. :meth:`process_coefficients`
       5. :meth:`process_core_orbitals`
       6. :meth:`finalize_coefficients`
-      7. :meth:`setup_stowfn`
-      8. :meth:`apply_cusp_correction` → writes ``stowfn.data``
-      9. :meth:`plot_cusps` → writes ``cusp_constraint.svg`` (optional)
+      7. :meth:`prune_empty_shells`
+      8. :meth:`setup_stowfn`
+      9. :meth:`apply_cusp_correction` → writes ``stowfn.data``
+      10. :meth:`plot_cusps` → writes ``cusp_constraint.svg`` (optional)
 
 
 .. function:: main()
