@@ -709,6 +709,10 @@ class ADFToStoWF:
                 for atom in range(self.sto.num_atom)
             ]
 
+        # Snap structural zeros polluted to ~1e-16 by the (dense, cross-centre)
+        # cusp projection back to exact zero in the written coefficients.
+        for sp in range(self.Nspins):
+            self.coeff[sp][np.abs(self.coeff[sp]) < 1e-10] = 0.0
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
