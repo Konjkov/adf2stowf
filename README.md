@@ -148,7 +148,7 @@ The ADF energies in the table below were obtained with this setting.
 | Ar     | -526.8175122 |  −526.81670427  | QZ4P |  -526.82031259 ± 0.00197973 | 1.8 |
 | Ga     | -1923.261001 | -1923.26303777  | QZ4P | -1923.24905423 ± 0.01358497 | 1.0 |
 | Kr     | -2752.054969 | −2752.05365745  | QZ4P | -2752.03578259 ± 0.01665038 | 1.1 |
-| Xe     | -7232.138349 | −7232.13699292  | QZ4P | -7232.08669813 ± 0.03351053 | 1.5 | -
+| Xe     | -7232.138349 | −7232.13699292  | QZ4P | -7232.18746631 ± 0.03176819 | 1.6 |
 
 **Note on numerical integration accuracy.**
 ADF evaluates integrals on a numerical atom-centered grid. At the default
