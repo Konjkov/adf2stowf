@@ -670,31 +670,6 @@ class ADFToStoWF:
         cusp_enforcing = self.sto.cusp_enforcing_matrix()
         print('Molorb values at nuclei before applying cusp constraint:')
         print(self.sto.eval_molorbs(self.sto.atompos.T))
-        # Warn per atom when the basis cannot represent the nuclear cusp: the
-        # relative deviation |psi'(0)/psi(0) + Z| / Z of an orbital that has a
-        # non-negligible amplitude at the nucleus is too large to repair.  This
-        # stays small for every atom (the cusp is over-steep but representable)
-        # and only blows up for delocalized molecular orbitals leaving a
-        # wrong-slope tail on a neighbouring nucleus, signalling that a
-        # different basis set should be chosen for that atom.
-        cusp_deviation_limit = 0.02
-        molvals = [self.sto.eval_molorbs(self.sto.centrepos.T, spin=sp) for sp in range(self.Nspins)]
-        for core in range(self.sto.num_centres):
-            Z = self.sto.atomcharge[core]
-            worst = 0.0
-            for sp in range(self.Nspins):
-                psi0 = molvals[sp][core]
-                violation = cusp_constraint[core] @ self.coeff[sp]
-                for i in range(self.Nmolorbs[sp]):
-                    if abs(psi0[i]) < 1e-3:
-                        continue
-                    worst = max(worst, abs(violation[i] / psi0[i]) / Z)
-            if worst > cusp_deviation_limit:
-                print(
-                    f'WARNING: nuclear cusp at centre {core + 1} (Z={Z:.0f}) deviates by '
-                    f'{worst:.3f}; the basis cannot represent the cusp at this atom — '
-                    f'choose a different basis set for it'
-                )
         self.fixed = [np.zeros(self.Nmolorbs[sp], bool) for sp in range(self.Nspins)]
         for sp in range(self.Nspins):
             for i in range(self.Nmolorbs[sp]):

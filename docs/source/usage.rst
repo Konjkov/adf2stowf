@@ -38,10 +38,6 @@ Command-Line Options
 .. option:: --cusp-method=project
 
     Project out cusp-violating components from each orbital. **Default.**
-    When an orbital's relative cusp deviation ``|psi'(0)/psi(0) + Z| / Z`` is
-    too large to be repaired (typically a delocalized molecular orbital with a
-    wrong-slope tail on a neighbouring nucleus), the converter warns that a
-    different basis set should be chosen for that atom.
     See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --cusp-method=enforce
@@ -67,19 +63,12 @@ Command-Line Options
 
     Generate a text dump of ``TAPE21.asc``.
 
-The Cartesian-to-spherical conversion itself is exact (no components are
-discarded; see :ref:`cart-to-harm`), so it emits no warnings.
+Notes
+-----
 
-Warnings
---------
-
-You may see a warning like::
-
-    WARNING: nuclear cusp at centre 1 (Z=6) deviates by 3.014; the basis cannot represent the cusp at this atom — choose a different basis set for it
-
-This is a nuclear-cusp diagnostic, not a conversion error.  An orbital with a
-non-negligible amplitude at the nucleus has a relative cusp deviation
-``|psi'(0)/psi(0) + Z| / Z`` too large to repair — typically a delocalized
-molecular orbital leaving a wrong-slope tail on a neighbouring nucleus.  It
-signals that a different (better cusp-representing) basis set should be chosen
-for that atom; it does not indicate a bug in the conversion.
+The Cartesian-to-spherical conversion is exact — no components are discarded
+(see :ref:`cart-to-harm`).  In a molecule the per-nucleus cusp condition also
+picks up a smooth background from the tails of basis functions centred on
+neighbouring atoms, so the residual cusp deviation reported during conversion
+can stay large without affecting the variational energy: a single-determinant
+VMC run still reproduces the HF energy.

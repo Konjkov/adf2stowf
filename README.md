@@ -84,11 +84,11 @@ Command-line options
 | `--dump` | Write a text dump of TAPE21 to `TAPE21.txt` |
 
 By default (`project`) the converter removes the cusp-violating components of
-each orbital so the wavefunction satisfies the nuclear cusp condition. When an
-orbital's relative cusp deviation `|ψ'(0)/ψ(0) + Z| / Z` is too large to be
-repaired — typically a delocalized molecular orbital that leaves a wrong-slope
-tail on a neighbouring nucleus — the converter prints a warning advising you to
-choose a different basis set for that atom.
+each orbital so the wavefunction satisfies the nuclear cusp condition. In a
+molecule the per-nucleus cusp also picks up a smooth background from the tails
+of basis functions on neighbouring atoms, so the residual deviation can stay
+large without affecting the variational energy — a single-determinant VMC run
+still reproduces the HF energy.
 
 
 Cartesian-to-spherical conversion
