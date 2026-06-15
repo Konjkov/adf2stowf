@@ -670,6 +670,11 @@ class ADFToStoWF:
         cusp_enforcing = self.sto.cusp_enforcing_matrix()
         print('Molorb values at nuclei before applying cusp constraint:')
         print(self.sto.eval_molorbs(self.sto.atompos.T))
+        # Coefficients that are exact zeros before the correction (unused
+        # polarisation/companion shells, symmetry zeros).  The dense cross-centre
+        # projection fills them with ~1e-16 noise; record them now so they can be
+        # restored to exact zero afterwards.
+        structural_zeros = [self.coeff[sp] == 0.0 for sp in range(self.Nspins)]
         self.fixed = [np.zeros(self.Nmolorbs[sp], bool) for sp in range(self.Nspins)]
         for sp in range(self.Nspins):
             for i in range(self.Nmolorbs[sp]):
@@ -709,10 +714,12 @@ class ADFToStoWF:
                 for atom in range(self.sto.num_atom)
             ]
 
-        # Snap structural zeros polluted to ~1e-16 by the (dense, cross-centre)
-        # cusp projection back to exact zero in the written coefficients.
+        # Restore the structural zeros polluted to ~1e-16 by the projection.
+        # A magnitude threshold is unsafe: the cusp constraint matrix has entries
+        # up to ~1e6, so a genuine but tiny core-s coefficient (~1e-11) can carry
+        # a ~1e-4 cusp contribution and must not be snapped.
         for sp in range(self.Nspins):
-            self.coeff[sp][np.abs(self.coeff[sp]) < 1e-10] = 0.0
+            self.coeff[sp][structural_zeros[sp]] = 0.0
         self.sto.coeff = [c.T for c in self.coeff]
         self.sto.check_and_normalize()
 
@@ -803,6 +810,39 @@ class ADFToStoWF:
         fig.tight_layout()
         fig.savefig('cusp_constraint.svg')
 
+    def prune_empty_shells(self):
+        """Drop shells that carry no weight in any written MO.
+
+        Unoccupied d/f polarisation functions (and the companion shells
+        appended for their contamination) have exactly-zero coefficients in
+        every occupied MO; emitting them only makes CASINO evaluate basis
+        functions that contribute nothing.  Pruning leaves the wavefunction
+        unchanged.  Runs before the cusp correction, while the unused
+        coefficients are still exact zeros.
+        """
+        used = np.zeros(self.Nharmbasfns, bool)
+        for c in self.coeff:
+            used |= np.any(np.abs(c) >= 1e-10, axis=1)
+        keep_rows = []
+        a = 0
+        for centre in range(self.Natoms):
+            st = self.shelltype_per_centre[centre]
+            keep = np.zeros(len(st), bool)
+            for s in range(len(st)):
+                n = self.Nharmpoly_per_shelltype[st[s]]
+                if used[a : a + n].any():
+                    keep[s] = True
+                    keep_rows.extend(range(a, a + n))
+                a += n
+            self.shelltype_per_centre[centre] = st[keep]
+            self.order_r_per_centre[centre] = self.order_r_per_centre[centre][keep]
+            self.zeta_per_centre[centre] = self.zeta_per_centre[centre][keep]
+        assert a == self.Nharmbasfns
+        keep_rows = np.array(keep_rows, dtype=int)
+        self.coeff = [c[keep_rows] for c in self.coeff]
+        self.Nshells_per_centre = np.array([len(s) for s in self.shelltype_per_centre])
+        self.Nharmbasfns = len(keep_rows)
+
     def run(self):
         self.process_valence_basis()
         self.process_core_basis()
@@ -810,6 +850,7 @@ class ADFToStoWF:
         self.process_coefficients()
         self.process_core_orbitals()
         self.finalize_coefficients()
+        self.prune_empty_shells()
         self.setup_stowfn()
         self.apply_cusp_correction()
         self.plot_cusps()

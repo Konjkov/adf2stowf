@@ -79,8 +79,8 @@ At a nucleus with charge Z, the exact wavefunction must satisfy:
 
 ADF orbitals computed in a Cartesian basis may violate this. The converter applies
 one of three corrections (CLI flag `--cusp-method`):
-- `enforce` (default): linear transformation of orbital coefficients to force cusp
-- `project`: project out cusp-violating components via null-space projection
+- `project` (default): project out cusp-violating components via null-space projection
+- `enforce`: linear transformation of orbital coefficients to force cusp
 - `none`: no correction (use only if cusps are already satisfied)
 
 ### Shell Types (ADF → CASINO encoding)
@@ -222,11 +222,29 @@ Shell type encoding in stowfn.data: `s=1, sp=2, p=3, d=4, f=5, g=6`
    at each nucleus to satisfy the cusp condition exactly. Any changes to cusp math
    must be validated against all examples/.
 
+   **Never snap coefficients to zero by magnitude after the cusp correction.** The
+   cusp constraint matrix has entries up to ~1e6 (the tightest core-s function of a
+   heavy atom, `norm·(Z−ζ)`), so a genuine coefficient as small as ~1e-11 can carry
+   a ~1e-4 cusp contribution. A `|coeff| < 1e-10` snap zeroed exactly such a core-s
+   coefficient in Ga's HOMO and re-broke the cusp (CASINO `STOWFDET_CUSP_CHECK`
+   warnings up to 1.4e-4). To clean the ~1e-16 noise the dense cross-centre
+   projection leaves in structurally-zero entries, record the `coeff == 0` mask
+   **before** the projection and restore only those entries afterwards
+   (`apply_cusp_correction`). CASINO checks the same absolute constraint
+   `|Σ cusp_constraint_matrix·coeff| < 1e-8` (`stowfdet.f90`), not a relative one.
+
 7. **Units**: all positions in ADF TAPE21 are in bohr (atomic units). CASINO also
    uses bohr. No unit conversion is needed.
 
 8. **Dummy atoms** (ghost atoms in ADF) are excluded from the centre list —
    only real atoms (`[:Natoms]`) are written to stowfn.data.
+
+9. **Empty-shell pruning** (`prune_empty_shells`, runs in `run()` after
+   `finalize_coefficients`): drops any shell — of any l, including appended
+   companion shells — whose coefficients are zero (`|c| < 1e-10`) in every written
+   MO. These are unused polarisation d/f and diffuse s/p functions; pruning leaves
+   the wavefunction unchanged but reduces the AO count CASINO evaluates (for atoms
+   roughly halves it). `--all-orbitals` keeps them, since virtuals use them.
 
 ---
 
