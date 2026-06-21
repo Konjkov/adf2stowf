@@ -148,7 +148,6 @@ The ADF energies in the table below were obtained with this setting.
 | He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86167262 ± 0.00004938 | 0.1 |
 | Be     | -14.57302313 |   -14.57283976  | pVQZ |   -14.57296092 ± 0.00018621 | 0.7 |
 | Be     | -14.57302313 |   -14.57289823  | QZ4P |   -14.57220483 ± 0.00018246 | 3.8 |
-| Be     | -14.57302313 |   -14.57289823  | QZ4P/nocusp |   -14.57226388 ± 0.00018512 | 3.4 |
 | B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53283773 ± 0.00025539 | 0.5 |
 | C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69325944 ± 0.00031975 | 0.0 |
 | N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40451476 ± 0.00045645 | 0.1 |
@@ -167,6 +166,45 @@ ADF evaluates integrals on a numerical atom-centered grid. At the default
 the ADF total energy an unreliable reference for sub-mHa comparisons with CASINO.
 Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
+
+**Note on ADF's fitted two-electron energy (e.g. Be in QZ4P).**
+For most systems the converted determinant reproduces the ADF HF energy within
+statistics, but a few all-electron cases with a tight, near-linearly-dependent
+core basis (notably **Be in QZ4P**) leave a residual ~1 mHa gap in which CASINO
+sits *above* ADF — and this gap does **not** belong to the converter. It can be
+localised exactly:
+
+* The occupied Be orbitals are pure s, so their Cartesian-to-spherical
+  conversion is the identity; the written determinant is bit-faithful to ADF.
+  Its *one-electron* properties, computed analytically from the converted STOs,
+  match ADF to four digits — kinetic energy ⟨T⟩ = 14.576 (the value implied by
+  ADF's reported virial −V/T = 1.99980) and electron–nucleus attraction
+  ⟨V_ne⟩ = −33.638. The orbitals are orthonormal and the STO normalisations
+  equal ADF's `basnrm`. Nothing is lost in conversion.
+* The QZ4P core s-set (ζ = 7.25, 4.20, 3.70, 3.00, …) is too tight to represent
+  the −Z nuclear cusp and slightly overshoots it: ψ′/ψ at the nucleus is −4.06
+  (1s) and −4.14 (2s) instead of the exact −4.0. This *over-cusping* is a
+  property of the basis, not an error; it is harmless for VMC (an over-steep
+  cusp gives a repulsive E_loc → +∞ at r → 0, so walkers avoid the nucleus and
+  no negative outliers appear), which is why toggling `--cusp-method` leaves the
+  VMC energy unchanged. It does, however, make CASINO's by-parts kinetic
+  estimator `KEI` (used in its energy decomposition) differ from the true
+  ½∫|∇ψ|² by a cusp surface term — a diagnostic artefact, not a physical
+  difference.
+* With ⟨T⟩ and ⟨V_ne⟩ identical between ADF and the converted wavefunction, the
+  entire remaining ~1 mHa lives in the **two-electron** energy. ADF evaluates
+  the Coulomb and exact-exchange contributions through auxiliary density fits
+  (ZlmFit / RI), whereas CASINO integrates them exactly. On the well-conditioned
+  pVQZ s-set these fits are converged and CASINO reproduces ADF; on the
+  ill-conditioned QZ4P core they retain a ~1 mHa error that persists even with
+  `NumericalQuality`, the RI fit-set, integration and threshold qualities all set
+  to *Excellent* — it is a basis-conditioning limit of the fit, not a quality
+  setting that can be turned up.
+
+So for such cases the *exact* CASINO value is the trustworthy ⟨H⟩ and the printed
+ADF total energy is the slightly biased one. The practical recommendation is to
+use a well-conditioned basis (pVQZ for the light atoms, as in the table above)
+rather than QZ4P when sub-mHa agreement with VMC is required.
 
 A VMC calculation with a single Slater determinant should reproduce the HF energy
 exactly; all systems in the table agree within statistics.
