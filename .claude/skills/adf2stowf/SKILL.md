@@ -29,6 +29,25 @@ adf2stowf                  →   stowfn.data (CASINO input)
 
 ---
 
+## Working agreement (division of labor)
+
+**Claude edits the source only. The user deploys and verifies.**
+
+- Claude's job: edit `adf2stowf/*.py` (the source tree), reason about the change, and
+  run **in-process checks of individual functions** (import the module, call methods, and
+  inspect intermediate quantities — matrices, weights, identities — as in scratch scripts).
+- The user's job: deploy the source to the test environment, regenerate `stowfn.data`
+  for the example systems, run CASINO, and report the energies.
+- Do **not** generate/overwrite the project's `stowfn.data` fixtures, reinstall the
+  package, or launch CASINO. CASINO VMC energy vs the ADF HF reference is the ground
+  truth; Claude's in-process numerical models are aids only and have been wrong before.
+- Verification protocol: test the cheapest discriminating system first (e.g. an atom with
+  occupied d such as **Ga**); if its energy is wrong, stop — do not test the rest.
+- Note: the venv may hold a stale non-editable copy at `site-packages/adf2stowf/` that
+  shadows the source. Deployment is the user's responsibility.
+
+---
+
 ## Physics Background
 
 ### Slater-Type Orbitals (STO)
@@ -60,8 +79,8 @@ At a nucleus with charge Z, the exact wavefunction must satisfy:
 
 ADF orbitals computed in a Cartesian basis may violate this. The converter applies
 one of three corrections (CLI flag `--cusp-method`):
-- `enforce` (default): linear transformation of orbital coefficients to force cusp
-- `project`: project out cusp-violating components via null-space projection
+- `project` (default): project out cusp-violating components via null-space projection
+- `enforce`: linear transformation of orbital coefficients to force cusp
 - `none`: no correction (use only if cusps are already satisfied)
 
 ### Shell Types (ADF → CASINO encoding)
@@ -84,17 +103,29 @@ sp-shells (shelltype=2) are a different concept not used here.
 ADF internally uses **Cartesian** d and f functions (6 d-functions, 10 f-functions),
 but STOs for CASINO must be expressed in **pure spherical harmonics** (5 d, 7 f).
 
-The extra Cartesian components (e.g., `x²+y²+z²` for d-shells, which has s-symmetry)
-are non-physical in a spherical harmonic context. The transformation matrices
-`harm2cart_map` and `cart2harm_map` handle this. If Cartesian orbitals contain
-s-type contamination in d-shells, a warning is printed:
+The extra Cartesian components are themselves Slater orbitals with the radial
+prefactor raised by r²: the `x²+y²+z²` component of a d-shell is an s orbital
+(`r²·r^order_r`), and the `x·r²`, `y·r²`, `z·r²` components of an f-shell are p
+orbitals. The conversion is therefore **exact** and is the only method: for every
+Cartesian d/f valence shell the converter appends a companion shell with
+`order_r + 2` and the same zeta (d → +s, f → +p), built in
+`_build_extended_valence_basis`. The full square `cart2harm_map[st]` block routes
+the harmonic rows to the parent shell and the contamination rows to the companion
+shell, so `harm2cart ∘ cart2harm = I` and no Cartesian component is lost.
 
-```
-WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
-```
-
-Use `--cart2harm-projection` to remove this contamination via SVD-based null-space
-projection (numerically stable, preferred over pseudoinverse).
+Normalisation (important): ADF stores MO coefficients relative to **individually
+normalised Cartesian monomials** — `bnorm` is **per basis function, not per shell**
+(within a d/f shell the components differ, e.g. `xy` vs `xx` by √3). CASINO instead
+wants coefficients of its own `get_norm`-normalised real harmonics. So the bare
+polynomial map must be conjugated by both norms: the d/f block in
+`process_coefficients` is `diag(1/get_norm) · cart2harm_map[st] · diag(bnorm)`
+(the radial factor cancels between parent and contamination rows, since they share
+`n = l + order_r + 1`, so the conjugation is purely angular). For s/p this reduces
+to the identity (`bnorm == get_norm`, one component per shell), which is why
+omitting it was invisible for s/p and for spherical atoms (closed/half-filled
+subshells are unitary-invariant) but distorted molecular d/f-bearing MOs by several
+mHa (HCN, CN⁻, O₃). Do **not** transpose `cart2harm_map[st]` in this block — a
+spurious `.T` passes a self-cancelling "identity check" yet destroys the orbitals.
 
 ---
 
@@ -181,19 +212,39 @@ Shell type encoding in stowfn.data: `s=1, sp=2, p=3, d=4, f=5, g=6`
    accumulated by eigenvalue and redistributed; a leftover warning is printed if any
    remain after all orbitals are processed.
 
-5. **`cart2harm_constraint`** captures the rows of `cart2harm_map` corresponding to
-   non-physical Cartesian components (rows beyond `n_harm`). These must be zero for
-   pure spherical harmonics. Violation norm > 1e-5 triggers a warning.
+5. **Cartesian → spherical is exact.** The rows of `cart2harm_map[st]` beyond
+   `n_harm` (the contamination components) are routed to an appended companion
+   shell (`order_r + 2`, same zeta) instead of being dropped, so the full square
+   block is used and the conversion loses nothing. See `_build_extended_valence_basis`.
 
 6. **Cusp enforcing** (`--cusp-method=enforce`) uses a linear operator derived in
    `stowfn.py:cusp_enforcing_matrix()` that modifies s-type orbital coefficients
-   at each nucleus to satisfy the cusp condition exactly.
+   at each nucleus to satisfy the cusp condition exactly. Any changes to cusp math
+   must be validated against all examples/.
+
+   **Never snap coefficients to zero by magnitude after the cusp correction.** The
+   cusp constraint matrix has entries up to ~1e6 (the tightest core-s function of a
+   heavy atom, `norm·(Z−ζ)`), so a genuine coefficient as small as ~1e-11 can carry
+   a ~1e-4 cusp contribution. A `|coeff| < 1e-10` snap zeroed exactly such a core-s
+   coefficient in Ga's HOMO and re-broke the cusp (CASINO `STOWFDET_CUSP_CHECK`
+   warnings up to 1.4e-4). To clean the ~1e-16 noise the dense cross-centre
+   projection leaves in structurally-zero entries, record the `coeff == 0` mask
+   **before** the projection and restore only those entries afterwards
+   (`apply_cusp_correction`). CASINO checks the same absolute constraint
+   `|Σ cusp_constraint_matrix·coeff| < 1e-8` (`stowfdet.f90`), not a relative one.
 
 7. **Units**: all positions in ADF TAPE21 are in bohr (atomic units). CASINO also
    uses bohr. No unit conversion is needed.
 
 8. **Dummy atoms** (ghost atoms in ADF) are excluded from the centre list —
    only real atoms (`[:Natoms]`) are written to stowfn.data.
+
+9. **Empty-shell pruning** (`prune_empty_shells`, runs in `run()` after
+   `finalize_coefficients`): drops any shell — of any l, including appended
+   companion shells — whose coefficients are zero (`|c| < 1e-10`) in every written
+   MO. These are unused polarisation d/f and diffuse s/p functions; pruning leaves
+   the wavefunction unchanged but reduces the AO count CASINO evaluates (for atoms
+   roughly halves it). `--all-orbitals` keeps them, since virtuals use them.
 
 ---
 

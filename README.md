@@ -21,6 +21,10 @@ high-accuracy QMC calculations.
 For general information about ADF, see https://www.scm.com/
 For CASINO, see https://vallico.net/casinoqmc/
 
+For an example of using ADF as a source of orbitals for all-electron QMC, see
+Nemec, Towler & Needs, *Benchmark all-electron ab initio quantum Monte Carlo
+calculations for small molecules* ([arXiv:0908.2041](https://arxiv.org/pdf/0908.2041)).
+
 
 Requirements
 ============
@@ -72,31 +76,54 @@ Command-line options
 
 | Option | Description |
 |--------|-------------|
-| `--cusp-method=enforce` | Apply cusp correction to active orbitals **(default)** |
-| `--cusp-method=project` | Project out cusp-violating components |
+| `--cusp-method=project` | Project out cusp-violating components **(default)** |
+| `--cusp-method=enforce` | Apply cusp correction to active orbitals |
 | `--cusp-method=none` | Disable cusp correction |
-| `--cart2harm-projection` | Enforce pure spherical harmonics via orthogonal projection |
 | `--all-orbitals` | Include virtual orbitals (default: occupied only) |
 | `--plot-cusps` | Plot cusp constraints (requires Matplotlib) |
 | `--dump` | Write a text dump of TAPE21 to `TAPE21.txt` |
 
+By default (`project`) the converter removes the cusp-violating components of
+each orbital so the wavefunction satisfies the nuclear cusp condition. In a
+molecule the per-nucleus cusp also picks up a smooth background from the tails
+of basis functions on neighbouring atoms, so the residual deviation can stay
+large without affecting the variational energy — a single-determinant VMC run
+still reproduces the HF energy.
 
-Cartesian-to-spherical warning
-===============================
 
-You may see a warning during conversion:
-
-    WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
+Cartesian-to-spherical conversion
+=================================
 
 ADF computes MOs in a Cartesian basis (6 d-functions, 10 f-functions).
 CASINO requires pure spherical harmonics (5 d, 7 f). The extra Cartesian
-components (e.g. the s-type contamination x²+y²+z² in d-shells) are
-unphysical in a spherical harmonic representation.
+components are not unphysical: they are themselves Slater orbitals with the
+radial prefactor raised by r². Specifically:
 
-Use `--cart2harm-projection` to remove these components via an orthogonal
-projection onto the pure spherical harmonic subspace. Without it, the
-contaminating components are silently dropped, which may slightly affect
-the total energy.
+- the s-type component x²+y²+z² of a d-shell is an s-type STO with radial prefactor r<sup>n+2</sup>
+- the p-type components x·r², y·r², z·r² of an f-shell are p-type STOs with radial prefactor r<sup>n+2</sup>
+
+The converter therefore represents each d/f shell **exactly** by appending a
+companion shell with radial prefactor r<sup>n+2</sup> and the same zeta — no
+Cartesian component is lost.
+
+A subtlety of this transformation is normalisation: ADF MO coefficients refer
+to individually normalised Cartesian monomials (the `bnorm` factors stored in
+TAPE21), while CASINO expects coefficients of its own normalised real
+harmonics. Within a d or f shell these norms differ between components, so the
+polynomial transformation is conjugated by them,
+`diag(1/casino_norm) · cart2harm · diag(bnorm)`. Omitting this conjugation
+distorts molecular orbitals that mix d/f with s/p functions — invisible for
+isolated atoms (closed and half-filled subshells are unitary-invariant) but
+worth several mHa in molecules such as HCN or O₃.
+
+Unused basis functions are pruned. Any shell — of any angular momentum
+(s, p, d, or f), including the appended companion shells — whose coefficients
+are zero in every written orbital is omitted from `stowfn.data`. These are
+typically the polarisation d/f functions and diffuse s/p functions that no
+occupied orbital uses; dropping them leaves the wavefunction unchanged while
+reducing the number of basis functions CASINO must evaluate (for atoms this
+can roughly halve the AO count). Pass `--all-orbitals` to keep them — the
+virtual orbitals make use of them.
 
 
 Accuracy
@@ -114,20 +141,23 @@ ADF and CASINO in units of the CASINO statistical uncertainty (σ).
 
 The ADF energies in the table below were obtained with this setting.
 
-| System | Reference HF | ADF (HF energy) | CASINO (VMC energy) | Δ/σ |
-|--------|-------------:|----------------:|--------------------:|-----|
-| H      |              |    -0.49999985  |    -0.49999991 ± 0.00000010 | 0.6 |
-| H₂     |              |    −1.13359570  |    −1.13353329 ± 0.00002835 | 2.2 |
-| He     | -2.861679993 |    -2.86166638  |    -2.86171447 ± 0.00004904 | 1.0 |
-| Be     | -14.57302313 |   -14.57283480  |   -14.57297667 ± 0.00018907 | 0.8 |
-| N      | -54.40093415 |   -54.40446246  |   -54.40424536 ± 0.00045720 | 0.4 |
-| HCN    |              |   -92.91102385  |   -92.90541795 ± 0.00197891 | 2.8 |
-| Ne     | -128.5470980 |  −128.54688836  |  −128.54704358 ± 0.00071620 | 0.2 |
-| O₃     |              |  −224.36156862  |  −224.35580398 ± 0.00177555 | 3.2 |
-| Ar     | -526.8175122 |  −526.81670427  |  −526.81634824 ± 0.00198243 | 0.2 |
-| Ga     | -1923.261001 | -1923.26711963  | -1923.24957555 ± 0.01358834 | 1.3 |
-| Kr     | -2752.054969 | −2752.05365745  | −2752.06972157 ± 0.01671619 | 1.0 |
-| Xe     | -7232.138349 | −7232.13699292  | -7232.08669813 ± 0.03351053 | 1.5 |
+| System | Reference HF | ADF (HF energy) | ADF (basis) | CASINO (VMC energy) | Δ/σ |
+|--------|-------------:|----------------:|:-----------:|--------------------:|-----|
+| H      |              |    -0.49999985  | QZ4P |    -0.49999978 ± 0.00000010 | 0.7 |
+| H₂     |              |    −1.13359570  | QZ4P |    -1.13357627 ± 0.00002838 | 0.7 |
+| He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86167262 ± 0.00004938 | 0.1 |
+| Be     | -14.57302313 |   -14.57283976  | pVQZ |   -14.57296092 ± 0.00018621 | 0.7 |
+| B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53283773 ± 0.00025539 | 0.5 |
+| C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69325944 ± 0.00031975 | 0.0 |
+| N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40451476 ± 0.00045645 | 0.1 |
+| CN⁻    |              |   -92.34646280  | pVQZ |   -92.34652077 ± 0.00063852 | 0.1 |
+| HCN    |              |   -92.91263786  | mix  |   -92.91268420 ± 0.00062088 | 0.1 |
+| Ne     | -128.5470980 |  −128.54688836  | QZ4P |  -128.54608391 ± 0.00071618 | 1.1 |
+| O₃     |              |  −224.36156862  | QZ4P |  -224.36217991 ± 0.00098628 | 0.6 |
+| Ar     | -526.8175122 |  −526.81670427  | QZ4P |  -526.81743472 ± 0.00199899 | 0.5 |
+| Ga     | -1923.261001 | -1923.26303777  | QZ4P | -1923.26059272 ± 0.01267982 | 0.2 | x10
+| Kr     | -2752.054969 | −2752.05365745  | QZ4P | -2752.03672628 ± 0.01784454 | 0.9 | x10
+| Xe     | -7232.138349 | −7232.13699292  | QZ4P | -7232.12063576 ± 0.03401843 | 0.5 | x10
 
 **Note on numerical integration accuracy.**
 ADF evaluates integrals on a numerical atom-centered grid. At the default
@@ -136,24 +166,17 @@ the ADF total energy an unreliable reference for sub-mHa comparisons with CASINO
 Always use `NUMERICALQUALITY excellent` in the ADF input when benchmarking
 against VMC energies.
 
-A VMC calculation with a single Slater determinant should reproduce the HF
-energy exactly. The large deviations for O₃ indicate a conversion error that needs
-to be investigated and fixed.
+A VMC calculation with a single Slater determinant should reproduce the HF energy
+exactly; all systems in the table agree within statistics.
 
 
-Testing
-=======
+Verification
+============
 
-Reference output files for all example systems are included in `examples/`.
-To run the regression tests:
-
-```bash
-pip install pytest
-pytest tests/test_vmc_energy.py -v
-```
-
-Each test runs the full conversion pipeline on `examples/<system>/TAPE21.asc`
-and compares the result against the reference `stowfn.data`.
+Correctness is verified by comparing the CASINO VMC energy of the converted
+`stowfn.data` against the ADF reference energy: a single-determinant VMC run
+must reproduce the HF energy. Reference inputs/outputs for all example systems
+are included in `examples/` (see the table above).
 
 
 Documentation

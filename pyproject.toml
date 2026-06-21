@@ -34,9 +34,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    'pytest>=8.4.0',
-]
 doc = [
     'sphinx>=9.0.0',
     'sphinx-rtd-theme>=3.0.0',

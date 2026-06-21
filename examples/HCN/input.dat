@@ -11,8 +11,9 @@ CHARGE 0 0
 
 
 BASIS
-  Type TZ2P
+  Type ET/ET-pVQZ
   Core None
+  H ZORA/QZ4P/H
 END
 
 XC

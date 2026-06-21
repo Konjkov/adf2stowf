@@ -304,7 +304,7 @@ class StoWfn:
                 # zet = [float(c.split()[0]) for c in l[start + 2 : endzeta]]
                 start = endzeta + 1
             else:
-                raise "unknown block starting with '" + l[start] + "'"
+                raise ValueError("unknown block starting with '" + l[start] + "'")
 
     def eval_molorbs(self, pos, spin=0):
         """Evaluate molecular orbitals at given positions.

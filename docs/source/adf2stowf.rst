@@ -16,9 +16,10 @@ The conversion pipeline covers:
 * Parsing geometry, basis set (valence + core), and MO coefficients from the
   ADF output via :class:`adfread.AdfParser`;
 * Remapping ADF's Cartesian angular basis functions to the real solid-harmonic
-  (spherical) polynomial basis expected by CASINO;
-* Optionally projecting out non-spherical contamination in d/f shells
-  (``--cart2harm-projection``);
+  (spherical) polynomial basis expected by CASINO.  The extra Cartesian
+  components of d/f shells are not discarded: each is itself a Slater orbital
+  and is represented exactly by an appended companion shell (d → +s, f → +p),
+  so the conversion is lossless;
 * Enforcing nuclear cusp conditions on the resulting MO coefficients through
   one of three strategies: *enforce*, *project*, or *none*;
 * Writing a ready-to-use :class:`stowfn.StoWfn` file and, optionally,
@@ -32,7 +33,7 @@ be instantiated programmatically.
 ADFToStoWF class
 ----------------
 
-.. class:: ADFToStoWF(plot_cusps, cusp_method, do_dump, cart2harm_projection, only_occupied)
+.. class:: ADFToStoWF(plot_cusps, cusp_method, do_dump, only_occupied)
 
    Top-level converter object.  Parses ``TAPE21.asc`` on construction and
    exposes the full conversion pipeline through :meth:`run`.
@@ -48,10 +49,6 @@ ADFToStoWF class
    :param do_dump: When ``True``, write a human-readable ``TAPE21.txt`` dump
       of the parsed ADF data (via :meth:`adfread.AdfParser.write_dump`).
    :type do_dump: bool
-   :param cart2harm_projection: When ``True``, project MO coefficients onto
-      the pure spherical-harmonic subspace before the Cartesian-to-spherical
-      transformation, removing s-type contamination in d/f shells.
-   :type cart2harm_projection: bool
    :param only_occupied: When ``True``, include only occupied MOs in the
       output (occupation >= 2/Nspins).  When ``False``, virtual orbitals
       are also written.
@@ -164,14 +161,8 @@ ADFToStoWF class
 
       Block-diagonal matrix that converts valence MO coefficients from the
       Cartesian AO basis (as stored in TAPE21) to the real solid-harmonic
-      basis required by CASINO.
-
-   .. attribute:: cart2harm_constraint
-      :type: numpy.ndarray
-
-      Rows of the harmonic-to-Cartesian matrices corresponding to
-      non-spherical (contaminating) components (e.g. the s-contamination
-      in a d shell).  Used to detect and optionally project out violations.
+      basis required by CASINO.  Each d/f block is conjugated by the per-function
+      ADF and CASINO normalisations (see :ref:`cart-to-harm`).
 
    **MO coefficients** (populated by :meth:`process_coefficients` and :meth:`finalize_coefficients`)
 
@@ -277,21 +268,20 @@ ADFToStoWF class
 
    .. method:: process_coefficients()
 
-      Build the Cartesian-to-spherical transformation, detect angular
-      contamination, optionally project it out, and transform MO coefficients
-      to the spherical basis.
+      Build the Cartesian-to-spherical transformation and apply it to the MO
+      coefficients.
 
-      Constructs the block-diagonal :attr:`cart2harm_matrix` and the
-      :attr:`cart2harm_constraint` from the per-shell :attr:`cart2harm_map`
-      entries.  Checks the constraint violation norm per MO and prints a
-      ``WARNING`` for any orbital exceeding ``1e-5``.
+      Assembles the block-diagonal :attr:`cart2harm_matrix` from the per-shell
+      :attr:`cart2harm_map` entries.  For d/f shells the bare polynomial block
+      is conjugated by the per-function normalisations,
+      ``diag(1/get_norm) · cart2harm_map[st] · diag(bnorm)``, because ADF MO
+      coefficients refer to individually normalised Cartesian monomials while
+      CASINO expects normalised real harmonics (see :ref:`cart-to-harm`).  The
+      full square block is used: the spherical-harmonic rows feed the parent
+      shell and the contamination rows feed the appended companion shell, so no
+      Cartesian component is lost.
 
-      When :attr:`CART2HARM_PROJECTION` is ``True``, computes an SVD-based
-      null-space projector **P = Q Qᵀ** (where the columns of **Q** span
-      ``null_space(cart2harm_constraint)``) and applies it to each MO in
-      place, verifying that the residual violation drops below ``1e-10``.
-
-      Finally, applies :attr:`cart2harm_matrix` to produce
+      Applies :attr:`cart2harm_matrix` to produce
       :attr:`valence_molorb_harm_coeff`.
 
       :raises AssertionError: If basis-function counts are inconsistent
@@ -317,6 +307,21 @@ ADFToStoWF class
       After this step, ``coeff[spin]`` has shape
       ``(Nharmbasfns, Nmolorbs[spin])`` and is ready to be passed to
       :class:`stowfn.StoWfn`.
+
+   .. method:: prune_empty_shells()
+
+      Drop shells that carry no weight in any written MO.
+
+      Any shell — of any angular momentum, including the appended companion
+      shells — whose coefficients are zero (below ``1e-10``) in every written
+      orbital is removed from :attr:`shelltype_per_centre`,
+      :attr:`order_r_per_centre`, :attr:`zeta_per_centre`, and the
+      corresponding rows of :attr:`coeff`; :attr:`Nshells_per_centre` and
+      ``Nharmbasfns`` are updated accordingly.  These are typically the
+      polarisation d/f functions and diffuse s/p functions that no occupied
+      orbital uses (with ``--all-orbitals`` the virtual orbitals keep them
+      alive).  Runs before the cusp correction, while the unused coefficients
+      are still exact zeros, and leaves the wavefunction unchanged.
 
    .. method:: setup_stowfn()
 
@@ -390,9 +395,10 @@ ADFToStoWF class
       4. :meth:`process_coefficients`
       5. :meth:`process_core_orbitals`
       6. :meth:`finalize_coefficients`
-      7. :meth:`setup_stowfn`
-      8. :meth:`apply_cusp_correction` → writes ``stowfn.data``
-      9. :meth:`plot_cusps` → writes ``cusp_constraint.svg`` (optional)
+      7. :meth:`prune_empty_shells`
+      8. :meth:`setup_stowfn`
+      9. :meth:`apply_cusp_correction` → writes ``stowfn.data``
+      10. :meth:`plot_cusps` → writes ``cusp_constraint.svg`` (optional)
 
 
 .. function:: main()
@@ -426,14 +432,9 @@ Command-line interface
      - Save ``cusp_constraint.svg`` with wavefunction values and local
        energies along the z-axis through each nucleus before and after
        cusp correction.
-   * - ``--cusp-method {enforce,project,none}``
-     - ``enforce``
+   * - ``--cusp-method {project,enforce,none}``
+     - ``project``
      - Nuclear cusp correction strategy (see :meth:`apply_cusp_correction`).
-   * - ``--cart2harm-projection``
-     - ``False``
-     - Project MO coefficients onto the pure spherical-harmonic subspace
-       before the Cartesian-to-spherical transformation, removing
-       angular-momentum contamination.
    * - ``--all-orbitals``
      - ``False``
      - Include virtual (unoccupied) MOs in the output.
@@ -481,11 +482,11 @@ Usage examples
 
    $ python adf2stowf.py --plot-cusps --all-orbitals --cusp-method=enforce
 
-**Enforce spherical purity, skip cusp correction**
+**Skip cusp correction (diagnostic)**
 
 .. code-block:: console
 
-   $ python adf2stowf.py --cart2harm-projection --cusp-method=none
+   $ python adf2stowf.py --cusp-method=none
 
 **Programmatic use**
 
@@ -495,9 +496,8 @@ Usage examples
 
    conv = adf2stowf.ADFToStoWF(
        plot_cusps=False,
-       cusp_method='enforce',
+       cusp_method='project',
        do_dump=False,
-       cart2harm_projection=True,
        only_occupied=True,
    )
    conv.run()
@@ -514,8 +514,10 @@ Cartesian to spherical-harmonic transformation
 
 ADF stores MO coefficients in a *Cartesian* STO basis; CASINO requires *real
 solid-harmonic* (spherical) basis functions.  For shells with angular momentum
-ℓ ≥ 2, the number of Cartesian functions exceeds the number of spherical ones,
-introducing redundant (contaminating) components:
+ℓ ≥ 2, the number of Cartesian functions exceeds the number of spherical ones.
+The extra components are themselves Slater orbitals (with the radial prefactor
+raised by :math:`r^2`) and are represented **exactly** by appending a companion
+shell — they are never discarded:
 
 .. list-table::
    :header-rows: 1
@@ -524,16 +526,16 @@ introducing redundant (contaminating) components:
    * - Shell
      - Cartesian fns
      - Spherical fns
-     - Contaminating component(s)
+     - Extra component(s) → companion shell
    * - d (ℓ=2)
      - 6
      - 5
-     - 1 s-type: :math:`x^2 + y^2 + z^2`
+     - 1 s-type: :math:`x^2 + y^2 + z^2` → +s shell
    * - f (ℓ=3)
      - 10
      - 7
      - 3 p-type: :math:`x(x^2+y^2+z^2)`,
-       :math:`y(x^2+y^2+z^2)`, :math:`z(x^2+y^2+z^2)`
+       :math:`y(x^2+y^2+z^2)`, :math:`z(x^2+y^2+z^2)` → +p shell
 
 
 Basis function ordering
@@ -598,64 +600,52 @@ Matrix equations
 ~~~~~~~~~~~~~~~~
 
 For each shell, the :attr:`harm2cart_map` matrix **M** (shape
-:math:`N_\text{cart} \times N_\text{cart}`) relates spherical-harmonic
-coefficients :math:`\mathbf{c}_\text{sph}` to Cartesian coefficients
+:math:`N_\text{cart} \times N_\text{cart}`, *full square*) relates the
+spherical-harmonic-plus-contamination polynomial coefficients
+:math:`\mathbf{c}_\text{sph}` to Cartesian coefficients
 :math:`\mathbf{c}_\text{cart}`:
 
 .. math::
 
    \mathbf{c}_\text{cart} = \mathbf{M}\, \mathbf{c}_\text{sph}
 
-The matrix **M** is partitioned row-wise into a *physical* block and a
-*constraint* block:
-
-.. math::
-
-   \mathbf{M} =
-   \begin{pmatrix} \mathbf{M}_\text{phys} \\ \mathbf{A} \end{pmatrix}
-
-where :math:`\mathbf{M}_\text{phys}` has :math:`N_\text{sph}` rows (the true
-spherical harmonics) and :math:`\mathbf{A}` has :math:`N_\text{cart} -
-N_\text{sph}` rows (the contaminating components stored in
-:attr:`cart2harm_constraint`).
-
-The inverse transformation (stored in :attr:`cart2harm_map`) is:
+The first :math:`N_\text{sph}` rows are the true spherical harmonics; the
+remaining rows are the contamination components, which feed the appended
+companion shell rather than being discarded.  Because the matrix is square and
+invertible the mapping is exact (bijective).  Its inverse is stored in
+:attr:`cart2harm_map`:
 
 .. math::
 
    \mathbf{c}_\text{sph} = \mathbf{M}^{-1}\, \mathbf{c}_\text{cart}
 
-and the physical block of :math:`\mathbf{M}^{-1}` gives the global
-:attr:`cart2harm_matrix` **C** (shape
-:math:`N_\text{harm}^\text{total} \times N_\text{cart}^\text{total}`),
-a block-diagonal matrix assembled over all centres and shells:
+**Normalisation.**  ADF MO coefficients refer to *individually normalised*
+Cartesian monomials (the per-function ``bnorm`` factors stored in TAPE21),
+whereas CASINO expects coefficients of *its own* normalised real harmonics
+(:meth:`stowfn.StoWfn.get_norm`).  Within a d or f shell these norms differ
+between components, so the bare polynomial inverse must be conjugated by both:
+
+.. math::
+
+   \mathbf{B} = \operatorname{diag}(1/\mathbf{n}_\text{CASINO})\;
+                \mathbf{M}^{-1}\;
+                \operatorname{diag}(\mathbf{n}_\text{ADF})
+
+The shared radial factor cancels between the parent and contamination rows
+(they have the same :math:`n = \ell + N + 1`), so the conjugation is purely
+angular.  For s and p shells it reduces to the identity
+(:math:`\mathbf{n}_\text{ADF} = \mathbf{n}_\text{CASINO}`, one component per
+shell), which is why omitting it is invisible for s/p and for spherical atoms
+but distorts molecular d/f-bearing orbitals by several mHa.
+
+The per-shell blocks :math:`\mathbf{B}` are assembled into the global
+block-diagonal :attr:`cart2harm_matrix` **C** (shape
+:math:`N_\text{harm}^\text{total} \times N_\text{cart}^\text{total}`) over all
+centres and shells, and applied to the MO coefficients:
 
 .. math::
 
    \mathbf{c}_\text{sph}^\text{MO} = \mathbf{C}\, \mathbf{c}_\text{cart}^\text{MO}
-
-**Contamination check.**  A Cartesian coefficient vector
-:math:`\mathbf{c}_\text{cart}` is *pure spherical* if and only if:
-
-.. math::
-
-   \mathbf{A}\, \mathbf{c}_\text{cart} = \mathbf{0}
-
-Violations are measured as
-:math:`\|\mathbf{A}\, \mathbf{c}_\text{cart}\|` and logged as warnings when
-they exceed :math:`10^{-5}`.
-
-**Projection (``--cart2harm-projection``).**  When contamination is present,
-the coefficient vector is projected onto the null space of **A** via:
-
-.. math::
-
-   \mathbf{c}_\text{proj} = \mathbf{Q}\mathbf{Q}^\top \mathbf{c}_\text{cart}
-
-where the columns of **Q** form an orthonormal basis for
-:math:`\ker(\mathbf{A})`, computed by ``scipy.linalg.null_space``.  After
-projection, :math:`\mathbf{A}\,\mathbf{c}_\text{proj} = \mathbf{0}` to
-machine precision.
 
 
 .. _cusp-conditions:
@@ -696,8 +686,8 @@ Dependencies
    * - ``numpy``
      - All array arithmetic throughout the pipeline.
    * - ``scipy.linalg``
-     - ``null_space`` for the Cartesian-to-spherical projection
-       (imported lazily when ``--cart2harm-projection`` is used).
+     - ``null_space`` for the ``project`` cusp-correction strategy
+       (used by :meth:`stowfn.StoWfn.cusp_projection_matrix`).
    * - ``matplotlib``
      - Cusp diagnostic plots (imported lazily when ``--plot-cusps`` is used).
    * - ``argparse``

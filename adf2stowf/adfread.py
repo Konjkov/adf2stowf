@@ -39,7 +39,7 @@ class AdfParser:
         """Convert ADF int string to Python int, handling overflow marker."""
         return -(2**31) if s == '**********' else int(s)
 
-    def _parse_integers(self, start: int, count: int) -> (np.ndarray, int):
+    def _parse_integers(self, start: int, count: int) -> tuple[np.ndarray, int]:
         values: List[int] = []
         i = start
         while len(values) < count:
@@ -47,7 +47,7 @@ class AdfParser:
             i += 1
         return np.array(values, int), i
 
-    def _parse_floats(self, start: int, count: int) -> (np.ndarray, int):
+    def _parse_floats(self, start: int, count: int) -> tuple[np.ndarray, int]:
         values: List[float] = []
         i = start
         while len(values) < count:
@@ -55,7 +55,7 @@ class AdfParser:
             i += 1
         return np.array(values, float), i
 
-    def _parse_strings(self, start: int, count: int) -> (List[str], int):
+    def _parse_strings(self, start: int, count: int) -> tuple[List[str], int]:
         raw = ''
         i = start
         while len(raw) < count:
@@ -66,7 +66,7 @@ class AdfParser:
         ]
         return values, i
 
-    def _parse_bools(self, start: int, count: int) -> (List[bool], int):
+    def _parse_bools(self, start: int, count: int) -> tuple[List[bool], int]:
         values: List[bool] = []
         i = start
         while len(values) < count:
@@ -74,7 +74,7 @@ class AdfParser:
             i += 1
         return values, i
 
-    def _parse_value(self, typ: int, start: int, count: int) -> (Any, int):
+    def _parse_value(self, typ: int, start: int, count: int) -> tuple[Any, int]:
         if typ == 1:
             return self._parse_integers(start, count)
         elif typ == 2:

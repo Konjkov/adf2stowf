@@ -33,21 +33,22 @@ Command-Line Options
 
 .. option:: adf2stowf
 
-    Run with defaults (equivalent to ``--cusp-method=enforce``).
-
-.. option:: --cusp-method=enforce
-
-    Apply cusp correction to active orbitals. **Default.**
-    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
+    Run with defaults (equivalent to ``--cusp-method=project``).
 
 .. option:: --cusp-method=project
 
-    Project out cusp-violating components from each orbital.
+    Project out cusp-violating components from each orbital. **Default.**
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
+
+.. option:: --cusp-method=enforce
+
+    Apply cusp correction to active orbitals.
     See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --cusp-method=none
 
     Disable cusp correction entirely.
+    See :ref:`cusp-conditions` in the :doc:`adf2stowf` module documentation.
 
 .. option:: --plot-cusps
 
@@ -58,32 +59,24 @@ Command-Line Options
     Include virtual orbitals in addition to occupied ones.
     Default: occupied orbitals only.
 
-.. option:: --cart2harm-projection
-
-    Enforce pure spherical harmonics via orthogonal projection.
-    See :ref:`cart-to-harm` in the :doc:`adf2stowf` module documentation.
-
 .. option:: --dump
 
     Generate a text dump of ``TAPE21.asc``.
 
-Warnings
---------
+Notes
+-----
 
-You may see a warning like::
+The Cartesian-to-spherical conversion is exact — no components are discarded
+(see :ref:`cart-to-harm`).  In a molecule the per-nucleus cusp condition also
+picks up a smooth background from the tails of basis functions centred on
+neighbouring atoms, so the residual cusp deviation reported during conversion
+can stay large without affecting the variational energy: a single-determinant
+VMC run still reproduces the HF energy.
 
-    WARNING: cartesian to spherical conversion for spin 0, orb 0 violated by 0.00063567
-
-This means the molecular orbitals (computed in a Cartesian Gaussian basis) contain
-non-spherical components — for example, s-type contamination (:math:`x^2+y^2+z^2`)
-in d- or f-shells. These components violate angular momentum purity and are unphysical
-in a spherical harmonic representation.
-
-To eliminate this warning, use ``--cart2harm-projection``. This applies an orthogonal
-projection that removes all constraint-violating components.
-
-.. note::
-
-    Even after projection the total energy may not match the original Cartesian-basis
-    energy, because unphysical (but energetically stabilizing) components are removed
-    without fully reconstructing the wavefunction in the pure spherical basis.
+Unused basis functions are pruned.  Any shell — of any angular momentum
+(s, p, d, or f), including the appended companion shells — whose coefficients
+are zero in every written orbital is omitted from ``stowfn.data``.  These are
+typically the polarisation d/f functions and diffuse s/p functions that no
+occupied orbital uses; dropping them leaves the wavefunction unchanged while
+reducing the number of basis functions CASINO must evaluate.  Use
+``--all-orbitals`` to keep them, since the virtual orbitals make use of them.
