@@ -38,6 +38,9 @@ doc = [
     'sphinx>=9.0.0',
     'sphinx-rtd-theme>=3.0.0',
 ]
+dev = [
+    'pytest>=8.0.0',
+]
 
 [project.urls]
 repository = 'https://github.com/Konjkov/adf2stowf'

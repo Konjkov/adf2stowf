@@ -216,3 +216,5 @@ examples/**/.runqmc.lock
 examples/**/TAPE21
 examples/**/logfile
 examples/**/t21.*
+# CocoIndex Code (ccc)
+/.cocoindex_code/

@@ -17,6 +17,10 @@ XC
   HartreeFock
 END
 
+RIHartreeFock
+  Quality Excellent
+End
+
 NUMERICALQUALITY excellent
 
 EPRINT

@@ -10,6 +10,39 @@ P2F_bool = {False: '.false.', True: '.true.'}
 
 num_orbs_per_shelltype = np.array([0, 1, 4, 3, 5, 7, 9])
 
+# Real-harmonic polynomial normalisation factors, indexed by the polynomial
+# slot used throughout (s: 0, p: 1-3, d: 4-8, f: 9-15, g: 16-24).
+_pi = np.pi
+POLYNORM = np.array(
+    [
+        sqrt(1.0 / (4.0 * _pi)),  # 0  s: 1
+        sqrt(3.0 / (4.0 * _pi)),  # 1  p: x
+        sqrt(3.0 / (4.0 * _pi)),  # 2  p: y
+        sqrt(3.0 / (4.0 * _pi)),  # 3  p: z
+        0.5 * sqrt(15.0 / _pi),  # 4  d: xy
+        0.5 * sqrt(15.0 / _pi),  # 5  d: yz
+        0.5 * sqrt(15.0 / _pi),  # 6  d: zx
+        0.25 * sqrt(5.0 / _pi),  # 7  d: 3zz - r^2
+        0.25 * sqrt(15.0 / _pi),  # 8  d: xx - yy
+        0.25 * sqrt(7.0 / _pi),  # 9  f: (2zz-3(xx+yy))z
+        0.25 * sqrt(10.5 / _pi),  # 10 f: (4zz-(xx+yy))x
+        0.25 * sqrt(10.5 / _pi),  # 11 f: (4zz-(xx+yy))y
+        0.25 * sqrt(105.0 / _pi),  # 12 f: (xx-yy)z
+        0.5 * sqrt(105.0 / _pi),  # 13 f: xy z
+        0.25 * sqrt(17.5 / _pi),  # 14 f: (xx-3yy)x
+        0.25 * sqrt(17.5 / _pi),  # 15 f: (3xx-yy)y
+        0.1875 * sqrt(1.0 / _pi),  # 16 g: 35zzzz-30zzrr+3rrrr
+        0.75 * sqrt(2.5 / _pi),  # 17 g: xz(7zz-3rr)
+        0.75 * sqrt(2.5 / _pi),  # 18 g: yz(7zz-3rr)
+        0.375 * sqrt(5.0 / _pi),  # 19 g: (xx-yy)(7zz-rr)
+        0.75 * sqrt(5.0 / _pi),  # 20 g: xy(7zz-rr)
+        0.75 * sqrt(17.5 / _pi),  # 21 g: xz(xx-3yy)
+        0.75 * sqrt(17.5 / _pi),  # 22 g: yz(3xx-yy)
+        0.1875 * sqrt(35.0 / _pi),  # 23 g: xxxx-6xxyy+yyyy
+        0.75 * sqrt(35.0 / _pi),  # 24 g: xxxy-xyyy
+    ]
+)
+
 
 class StoWfn:
     def __init__(self, fname=None):
@@ -766,42 +799,10 @@ class StoWfn:
     def get_norm(self):
         """Compute normalization factors for atomic orbitals."""
 
-        pi = np.pi
-        num_poly_in_shell_type = np.array([0, 1, 4, 3, 5, 7, 9])
+        num_poly_in_shell_type = num_orbs_per_shelltype
         first_poly_in_shell_type = np.array([0, 0, 0, 1, 4, 9, 16])
         polypow = np.array([0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4])
-        # normalization table for polynomials
-        polynorm = np.zeros(25)
-        # S-shell:
-        polynorm[0] = sqrt(1.0 / (4.0 * pi))  # 1
-        # P-shell:
-        polynorm[1] = sqrt(3.0 / (4.0 * pi))  # x
-        polynorm[2] = sqrt(3.0 / (4.0 * pi))  # y
-        polynorm[3] = sqrt(3.0 / (4.0 * pi))  # z
-        # D-shell:
-        polynorm[4] = 0.5 * sqrt(15.0 / pi)  # xy
-        polynorm[5] = 0.5 * sqrt(15.0 / pi)  # yz
-        polynorm[6] = 0.5 * sqrt(15.0 / pi)  # zx
-        polynorm[7] = 0.25 * sqrt(5.0 / pi)  # 3zz - r^2
-        polynorm[8] = 0.25 * sqrt(15.0 / pi)  # xx - yy
-        # F-shell:
-        polynorm[9] = 0.25 * sqrt(7.0 / pi)  # (2*zz-3*(xx+yy))*z
-        polynorm[10] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*x
-        polynorm[11] = 0.25 * sqrt(10.5 / pi)  # (4*zz-(xx+yy))*y
-        polynorm[12] = 0.25 * sqrt(105.0 / pi)  # (xx-yy)*z
-        polynorm[13] = 0.5 * sqrt(105.0 / pi)  # xy*z
-        polynorm[14] = 0.25 * sqrt(17.5 / pi)  # (xx-3.0*yy)*x
-        polynorm[15] = 0.25 * sqrt(17.5 / pi)  # (3.0*xx-yy)*y
-        # G-shell:
-        polynorm[16] = 0.1875 * sqrt(1.0 / pi)  # 35zzzz-30zzrr+3rrrr
-        polynorm[17] = 0.75 * sqrt(2.5 / pi)  # xz(7zz-3rr)
-        polynorm[18] = 0.75 * sqrt(2.5 / pi)  # yz(7zz-3rr)
-        polynorm[19] = 0.375 * sqrt(5.0 / pi)  # (xx-yy)(7zz-rr)
-        polynorm[20] = 0.75 * sqrt(5.0 / pi)  # xy(7zz-rr)
-        polynorm[21] = 0.75 * sqrt(17.5 / pi)  # xz(xx-3yy)
-        polynorm[22] = 0.75 * sqrt(17.5 / pi)  # yz(3xx-yy)
-        polynorm[23] = 0.1875 * sqrt(35.0 / pi)  # xxxx-6xxyy+yyyy
-        polynorm[24] = 0.75 * sqrt(35.0 / pi)  # xxxy-xyyy
+        polynorm = POLYNORM
 
         norm = np.zeros(self.num_atorbs)
         n_shell = n_atorb = 0

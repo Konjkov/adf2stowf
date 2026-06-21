@@ -8,16 +8,13 @@ import numpy as np
 from adf2stowf import adfread, stowfn
 
 # Output (spherical-harmonic + contamination) polynomial norms per d/f shelltype,
-# matching StoWfn.get_norm ordering: d -> [xy, yz, zx, 3zz-r2, xx-yy, s-contam],
-# f -> [7 f-harmonics, px, py, pz contaminants].
-_PI = np.pi
+# sliced from the single StoWfn.POLYNORM table to avoid a duplicate copy:
+# d -> 5 d-harmonics (4:9) + s contaminant (0); f -> 7 f-harmonics (9:16) + p
+# contaminants (1:4).
 _PN_OUT = {
-    4: np.array([0.5 * np.sqrt(15 / _PI), 0.5 * np.sqrt(15 / _PI), 0.5 * np.sqrt(15 / _PI),
-                 0.25 * np.sqrt(5 / _PI), 0.25 * np.sqrt(15 / _PI), np.sqrt(1 / (4 * _PI))]),
-    5: np.array([0.25 * np.sqrt(7 / _PI), 0.25 * np.sqrt(10.5 / _PI), 0.25 * np.sqrt(10.5 / _PI),
-                 0.25 * np.sqrt(105 / _PI), 0.5 * np.sqrt(105 / _PI), 0.25 * np.sqrt(17.5 / _PI), 0.25 * np.sqrt(17.5 / _PI),
-                 np.sqrt(3 / (4 * _PI)), np.sqrt(3 / (4 * _PI)), np.sqrt(3 / (4 * _PI))]),
-}  # fmt: skip
+    4: np.concatenate([stowfn.POLYNORM[4:9], stowfn.POLYNORM[0:1]]),
+    5: np.concatenate([stowfn.POLYNORM[9:16], stowfn.POLYNORM[1:4]]),
+}
 _L_OUT = {4: 2, 5: 3}
 
 np.set_printoptions(
