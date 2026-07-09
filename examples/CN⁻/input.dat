@@ -10,13 +10,19 @@ CHARGE -1 0
 
 
 BASIS
-  Type ET/ET-pVQZ
+  Type QZ4P
   Core None
 END
 
 XC
   HartreeFock
 END
+
+RIHartreeFock
+  UseMe True
+  Quality Excellent
+  DependencyThreshold 1.0E-8
+End
 
 NUMERICALQUALITY excellent
 

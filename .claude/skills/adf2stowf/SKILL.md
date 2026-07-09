@@ -263,6 +263,42 @@ adf2stowf/
 
 ---
 
+## ADF Accuracy Settings (required for sub-mHa VMC comparison)
+
+The ADF total energy is a valid sub-mHa reference for CASINO only if the ADF input
+contains:
+
+```
+NUMERICALQUALITY excellent
+```
+
+(the default grid quality leaves 1–2 mHa of quadrature error), and for all-electron
+runs with a tight, near-linearly-dependent core basis (e.g. **Be/QZ4P**) also:
+
+```
+RIHartreeFock
+  UseMe True
+  Quality Excellent
+  DependencyThreshold 1.0E-8
+End
+```
+
+Found 2026-07 on Be/QZ4P (was ~1 mHa CASINO-above-ADF at 4σ; now 0.6σ, ADF
+−14.57301106 = numerical HF limit −14.57302317 + 12 µHa):
+
+- ADF's default **pair-fit** HF exchange cannot represent the exchange on the
+  ill-conditioned QZ4P core: the SCF converges to orbitals ~1 mHa above the true
+  basis-set minimum. CASINO's exact ⟨H⟩ of those orbitals was honest all along —
+  such a gap is an ADF input problem, **not a converter bug**.
+- The `RIHartreeFock` block is **inert without `UseMe True`** (default False); its
+  other subkeys are silently ignored.
+- `UseMe True` alone makes it *worse*: the scheme's default `DependencyThreshold
+  1e-3` removes near-linearly-dependent combinations from the exchange matrix —
+  exactly the tight core-s subspace at issue. Lower it to 1e-8.
+- Alternative: a well-conditioned basis (pVQZ for light atoms) avoids the issue.
+
+---
+
 ## Common Pitfalls
 
 - If `froc_A` values sum to a non-integer, ADF used fractional occupation (smearing).

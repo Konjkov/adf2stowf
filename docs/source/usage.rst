@@ -28,6 +28,29 @@ This reads ``TAPE21.asc`` and writes ``stowfn.data``.
 
 in the CASINO input file.
 
+ADF Accuracy Settings
+---------------------
+
+For a sub-mHa comparison between the ADF HF energy and CASINO VMC the ADF
+input must contain::
+
+    NUMERICALQUALITY excellent
+
+(the default grid quality leaves 1–2 mHa of quadrature error), and in some
+cases — all-electron calculations with a tight, near-linearly-dependent core
+basis (e.g. Be in QZ4P), where ADF's default pair-fit exchange leaves the SCF
+about 1 mHa above the true basis-set minimum — also::
+
+    RIHartreeFock
+      UseMe True
+      Quality Excellent
+      DependencyThreshold 1.0E-8
+    End
+
+Note that the ``RIHartreeFock`` block is inert without ``UseMe True``, and the
+default ``DependencyThreshold`` of 1e-3 must be lowered — it removes exactly
+the tight core combinations at issue.
+
 Command-Line Options
 --------------------
 

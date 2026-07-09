@@ -218,3 +218,6 @@ examples/**/logfile
 examples/**/t21.*
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+
+# kfreader reference docs
+/kfreader/*.pdf

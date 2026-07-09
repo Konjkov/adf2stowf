@@ -136,7 +136,7 @@ numerical Roothaan–Hartree–Fock energies from Bunge, Barrientos & Bunge,
 *Atomic Data and Nuclear Data Tables* **53**, 113 (1993)
 ([doi:10.1006/adnd.1993.1003](https://doi.org/10.1006/adnd.1993.1003)),
 accurate to 8–10 significant figures, for ground-state atoms He–Xe expressed
-in a Slater-type orbital basis. The Δ/σ column shows the deviation between
+in a Slater-type orbital basis. The **Δ/σ** column shows the deviation between
 ADF and CASINO in units of the CASINO statistical uncertainty (σ).
 
 The ADF energies in the table below were obtained with the accuracy settings
@@ -148,10 +148,10 @@ described in the note below the table.
 | H₂     |              |    −1.13359570  | QZ4P |    -1.13357627 ± 0.00002838 | 0.7 |
 | He     | -2.861679993 |    -2.86166638  | QZ4P |    -2.86167262 ± 0.00004938 | 0.1 |
 | Be     | -14.57302313 |   -14.57301106  | QZ4P |   -14.57312996 ± 0.00018460 | 0.6 |
-| B      | -24.52906069 |   -24.53271345  | pVQZ |   -24.53283773 ± 0.00025539 | 0.5 |
-| C      | -37.68861890 |   -37.69324989  | pVQZ |   -37.69325944 ± 0.00031975 | 0.0 |
+| B      | -24.52906069 |   -24.53307467  | QZ4P |   -24.53333575 ± 0.00025290 | 1.0 |
+| C      | -37.68861890 |   -37.69365818  | QZ4P |   -37.69372952 ± 0.00032571 | 0.2 |
 | N      | -54.40093415 |   -54.40446246  | QZ4P |   -54.40451476 ± 0.00045645 | 0.1 |
-| CN⁻    |              |   -92.34646280  | pVQZ |   -92.34652077 ± 0.00063852 | 0.1 |
+| CN⁻    |              |   -92.34767419  | QZ4P |   -92.34833189 ± 0.00062997 | 1.0 |
 | HCN    |              |   -92.91263786  | mix  |   -92.91268420 ± 0.00062088 | 0.1 |
 | Ne     | -128.5470980 |  −128.54688836  | QZ4P |  -128.54608391 ± 0.00071618 | 1.1 |
 | O₃     |              |  −224.36156862  | QZ4P |  -224.36217991 ± 0.00098628 | 0.6 |
