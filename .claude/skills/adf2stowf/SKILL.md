@@ -295,7 +295,19 @@ Found 2026-07 on Be/QZ4P (was ~1 mHa CASINO-above-ADF at 4σ; now 0.6σ, ADF
 - `UseMe True` alone makes it *worse*: the scheme's default `DependencyThreshold
   1e-3` removes near-linearly-dependent combinations from the exchange matrix —
   exactly the tight core-s subspace at issue. Lower it to 1e-8.
-- Alternative: a well-conditioned basis (pVQZ for light atoms) avoids the issue.
+- **`DependencyThreshold 1e-8` is ATOM-ONLY.** In molecules (seen on HCN/QZ4P,
+  even at 1e-5) the cross-centre overlap of diffuse functions creates genuine
+  near-linear dependence that must stay removed: the SCF oscillates wildly
+  (errors up to ~660 a.u.) and "converges" to garbage (−2088.65 vs expected
+  ≈ −92.91). This is the failure mode the ADF manual documents for this key
+  ("unphysically large bond energy → raise DependencyThreshold"). For molecules
+  keep the default 1e-3 (omit the line).
+- **QZ4P itself is atom-oriented.** In molecules it does not give an accurate
+  wavefunction: either the automatic dependency truncation (`Dependency
+  bas=4e-3`, auto-on for HF) distorts the basis, or keeping it intact
+  destabilizes the SCF. Recipe split: atoms → QZ4P + RIHartreeFock block above;
+  molecules → a well-conditioned pVQZ-based basis (the "mix" basis for HCN in
+  the README table, ADF↔CASINO agreement 0.1σ).
 
 ---
 

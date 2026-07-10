@@ -51,6 +51,17 @@ Note that the ``RIHartreeFock`` block is inert without ``UseMe True``, and the
 default ``DependencyThreshold`` of 1e-3 must be lowered — it removes exactly
 the tight core combinations at issue.
 
+``DependencyThreshold 1e-8`` is for **atoms only**.  In molecules the
+cross-centre overlap of diffuse QZ4P functions creates genuine near-linear
+dependence that must stay removed: with a tiny threshold the SCF becomes
+unstable and converges to an unphysical energy.  For molecules keep the
+default (omit the line).
+
+More generally, QZ4P itself is atom-oriented and does not give an accurate
+wavefunction in molecules — either the automatic dependency truncation
+distorts the basis or keeping it intact destabilizes the SCF.  For molecules
+use a well-conditioned pVQZ-based basis instead.
+
 Command-Line Options
 --------------------
 

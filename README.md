@@ -184,6 +184,19 @@ Note that the `RIHartreeFock` block is inert without `UseMe True`, and the
 default `DependencyThreshold 1e-3` must be lowered — it removes exactly the
 tight core combinations at issue.
 
+`DependencyThreshold 1e-8` is for **atoms only**. In molecules the
+cross-centre overlap of diffuse QZ4P functions creates genuine near-linear
+dependence that must stay removed: with a tiny threshold the SCF becomes
+unstable and converges to an unphysical energy (the failure mode the ADF
+manual describes for this key). For molecules keep the default (omit the
+line).
+
+More generally, QZ4P itself is atom-oriented: in molecules it does not give
+an accurate wavefunction — either the automatic dependency truncation
+distorts the basis or keeping it intact destabilizes the SCF. For molecules
+use a well-conditioned pVQZ-based basis instead (the "mix" basis for HCN in
+the table above).
+
 A VMC calculation with a single Slater determinant should reproduce the HF energy
 exactly; all systems in the table agree within statistics.
 
