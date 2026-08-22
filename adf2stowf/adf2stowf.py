@@ -756,7 +756,10 @@ class ADFToStoWF:
         """
         if not self.do_plot_cusps:
             return
-        import matplotlib.pyplot as plt
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise SystemExit('--plot-cusps requires matplotlib, install it with: pip install adf2stowf[plot]')
 
         # Create a 2 x Natom grid of subplots
         # Top row: wavefunction values (val)
@@ -871,9 +874,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-    parser.add_argument(
-        '--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps (e.g., density derivative at nuclei) (default: False)'
-    )
+    parser.add_argument('--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps, requires matplotlib (default: False)')
 
     parser.add_argument(
         '--cusp-method',

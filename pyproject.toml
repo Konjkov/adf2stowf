@@ -1,10 +1,10 @@
 [build-system]
-requires = ['setuptools>=61.0', 'wheel']
+requires = ['setuptools>=77.0']
 build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'adf2stowf'
-version = '1.0.0'
+version = '1.1.0'
 description = 'Converter from ADF TAPE21.asc to CASINO stowfn.data'
 authors = [
     {name = "Vladimir Konkov", email = "Konjkov.VV@gmail.com"},
@@ -13,13 +13,14 @@ maintainers = [
     {name = "Vladimir Konkov", email = "Konjkov.VV@gmail.com"},
 ]
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Environment :: Console',
     'Intended Audience :: Science/Research',
     'Operating System :: POSIX :: Linux',
     'Topic :: Scientific/Engineering :: Chemistry',
-    'Programming Language :: C++',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
@@ -30,10 +31,12 @@ requires-python = ">=3.10,<3.15"
 dependencies = [
     'numpy>=2.0.0',
     'scipy>=1.13.1',
-    'matplotlib>=3.9.0',
 ]
 
 [project.optional-dependencies]
+plot = [
+    'matplotlib>=3.9.0',
+]
 doc = [
     'sphinx>=9.0.0',
     'sphinx-rtd-theme>=3.0.0',

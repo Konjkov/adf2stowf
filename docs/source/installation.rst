@@ -41,10 +41,12 @@ Dependencies
 
 Required:
 
-* Python >= 3.9, < 3.12
-* NumPy >= 1.24.4
+* Python >= 3.10, < 3.15
+* NumPy >= 2.0.0
 * SciPy >= 1.13.1
 
-Optional (for cusp plotting):
+Optional (for cusp plotting)::
+
+    pip install adf2stowf[plot]
 
 * Matplotlib >= 3.9.0

@@ -1,11 +1,12 @@
 import os
 import sys
+from importlib.metadata import version as _version
 
 sys.path.insert(0, os.path.abspath('../adf2stowf'))
 
 project = 'adf2stowf'
 copyright = '2026, Konkov Vladimir'
-release = version = '0.9.1'
+release = version = _version('adf2stowf')
 author = 'Konkov Vladimir'
 
 extensions = [

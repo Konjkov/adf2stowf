@@ -42,6 +42,12 @@ Installation
 pip install adf2stowf
 ```
 
+with cusp plotting support:
+
+```bash
+pip install adf2stowf[plot]
+```
+
 or from source:
 
 ```bash
