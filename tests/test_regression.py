@@ -10,6 +10,7 @@ import contextlib
 import io
 import os
 import pathlib
+import re
 import shutil
 import sys
 
@@ -31,10 +32,16 @@ CASES = sorted(
 )
 
 
+# Floats are written in fixed 20-character columns ('% .13E'), so a negative
+# value fills the column that would otherwise hold the separating blank and
+# sticks to its left neighbour.  Split those apart before tokenising.
+GLUED = re.compile(r'(?<=\d)(?=-)')
+
+
 def _tokens(path):
     """Split a stowfn.data file into tokens, parsing numbers as floats."""
     tokens = []
-    for tok in path.read_text().split():
+    for tok in GLUED.sub(' ', path.read_text()).split():
         try:
             tokens.append(float(tok))
         except ValueError:
