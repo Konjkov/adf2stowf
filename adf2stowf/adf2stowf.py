@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from importlib.metadata import version
 from math import factorial
 
 import numpy as np
@@ -47,7 +48,6 @@ class ADFToStoWF:
         self.Basis = self.data['Basis']
         self.Core = self.data['Core']
         self.Symmetry = self.data['Symmetry']
-        self.Total_Energy = self.data['Total Energy']
 
         self._parse_system()
         self.Nharmpoly_per_shelltype, self.Ncartpoly_per_shelltype, self.harm2cart_map, self.cart2harm_map = self._build_cart2harm_maps()
@@ -536,7 +536,7 @@ class ADFToStoWF:
         molorb = 0
         for atom in range(self.Natoms):
             at = self.atyp_idx[atom]
-            first_harmbasfn = np.sum(self.Nharmbasfns_per_centre[:atom])
+            first_harmbasfn = sum(self.Nharmbasfns_per_centre[:atom])
             Ncore_harmbasfns = sum(self.Nharmpoly_per_shelltype[st].sum() for st in self.core_shelltype_per_atomtype[at])
             core_coeff = np.zeros([Ncore_harmbasfns])
             ccor_per_shell = np.array_split(self.ccor_per_atomtype[at], np.cumsum((self.nrcset * self.nrcorb)[at, :]))[:-1]
@@ -617,11 +617,11 @@ class ADFToStoWF:
         self.sto.spin_unrestricted = not self.spin_restricted
         self.sto.atomcharge = self.total_charge_per_atomtype[self.atyp_idx]
         assert len(self.sto.atomcharge) == self.Natoms
-        self.sto.nuclear_repulsion_energy = 0.0
-        if self.Natoms > 1:
-            self.sto.nuclear_repulsion_energy = self.Total_Energy['Nuclear repulsion energy'][0] / self.Natoms
         self.sto.num_elec = self.Nvalence_electrons + 2 * self.Ncore_molorbs
         self.sto.atompos = self.sto.centrepos = self.Geometry['xyz'].reshape(self.Natoms + self.Ndummies, 3)[: self.Natoms, :]
+        i, j = np.triu_indices(self.Natoms, k=1)
+        r = np.linalg.norm(self.sto.atompos[i] - self.sto.atompos[j], axis=1)
+        self.sto.nuclear_repulsion_energy = np.sum(self.sto.atomcharge[i] * self.sto.atomcharge[j] / r) / self.Natoms
         self.sto.atomnum = self.atomicnumber_per_atomtype[self.atyp_idx]
         self.sto.num_centres = self.Natoms
         self.sto.num_shells = np.sum(self.Nshells_per_centre)
@@ -873,6 +873,8 @@ def main():
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
+    parser.add_argument('--version', action='version', version=f"%(prog)s {version('adf2stowf')}")
 
     parser.add_argument('--plot-cusps', action='store_true', help='Enable plotting of nuclear cusps, requires matplotlib (default: False)')
 

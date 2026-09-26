@@ -1,6 +1,23 @@
 Changelog
 =========
 
+1.2.0
+-----
+
+Added
+
+* `--version` option.
+
+Fixed
+
+* The ADF `Total Energy` section is no longer required (it is only written when
+  `TotalEnergy` is in the ADF input, and its absence stopped the conversion with
+  `KeyError: 'Total Energy'`). The nuclear repulsion energy is now computed from
+  the geometry and nuclear charges, which reproduces the ADF value exactly.
+* Frozen-core molecules whose first atom carries a core no longer stop with a
+  `TypeError`: the basis offset of the first atom was the float `np.sum([])`
+  and was used as a slice index.
+
 1.1.0
 -----
 
