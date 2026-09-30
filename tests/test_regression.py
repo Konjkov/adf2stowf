@@ -17,6 +17,8 @@ import sys
 import numpy as np
 import pytest
 
+from adf2stowf.stowfn import StoWfn, num_orbs_per_shelltype
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -71,3 +73,15 @@ def test_regression(case, tmp_path):
             assert isinstance(g, float) and np.isclose(g, w, rtol=1e-8, atol=1e-10), f'{case}: token {i} differs: got {g!r}, want {w!r}'
         else:
             assert g == w, f'{case}: token {i} differs: got {g!r}, want {w!r}'
+
+def test_cusp_fixed_atorbs():
+       """The cusp is imposed through an s function that is nonzero at the nucleus,
+       even when an s function with a radial prefactor has a larger zeta."""
+       sto = StoWfn(str(EXAMPLES / 'Ne' / 'stowfn.data'))
+       s_shells = np.flatnonzero(sto.shelltype == 1)
+       sto.zeta[s_shells[sto.order_r_in_shell[s_shells] > 0][0]] = 2 * sto.zeta.max()
+       shell_of_atorb = np.repeat(np.arange(sto.num_shells), num_orbs_per_shelltype[sto.shelltype])
+       shell = shell_of_atorb[sto.cusp_fixed_atorbs()[0]]
+       assert sto.order_r_in_shell[shell] == 0
+       assert sto.zeta[shell] == sto.zeta[s_shells[sto.order_r_in_shell[s_shells] == 0]].max()
+

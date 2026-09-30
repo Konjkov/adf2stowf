@@ -666,7 +666,7 @@ The three ``--cusp-method`` strategies differ in how they restore this
 condition when it is violated:
 
 * **enforce** — adjusts only the coefficient of the highest-exponent s-type
-  AO on each centre via the matrix **M** = **I** − **e**\ :sub:`fix`
+  AO with no radial prefactor (``order_r = 0``) on each centre via the matrix **M** = **I** − **e**\ :sub:`fix`
   **A**:sup:`+` **A**, leaving all other coefficients unchanged.
 * **project** — applies the null-space projector **Q Q**:sup:`T` to remove
   all cusp-violating components simultaneously.

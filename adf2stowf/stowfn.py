@@ -881,6 +881,10 @@ class StoWfn:
     def cusp_fixed_atorbs(self):
         """Determine the atomic orbitals fixed by the cusp constraint.
 
+        On each centre this is the s function of largest zeta among those with
+        no radial prefactor (order_r = 0), the only ones that do not vanish at
+        the nucleus; CASINO's cusp_correction makes the same choice.
+
         Returns:
             numpy.ndarray: Indices of cusp-fixed AOs (num_centres,).
         """
@@ -888,7 +892,7 @@ class StoWfn:
         for c in range(self.num_centres):
             cidx = np.zeros(self.num_shells)
             cidx[self.idx_first_shell_on_centre[c] : self.idx_first_shell_on_centre[c + 1]] = 1.0
-            shell = np.argmax(self.zeta * cidx * (self.shelltype == 1))
+            shell = np.argmax(self.zeta * cidx * (self.shelltype == 1) * (self.order_r_in_shell == 0))
             res[c] = num_orbs_per_shelltype[self.shelltype[:shell]].sum()
         return res
 

@@ -426,9 +426,12 @@ StoWfn class
       Identify the AO index that is "fixed" (pinned) by the cusp constraint
       on each centre.
 
-      For each centre the s-type shell with the *largest* Slater exponent is
-      selected as the representative AO; its coefficient is determined by the
-      cusp condition rather than optimized freely.
+      For each centre the s-type shell with no radial prefactor
+      (``order_r = 0``) and the *largest* Slater exponent is selected as the
+      representative AO; its coefficient is determined by the cusp condition
+      rather than optimized freely.  s functions with a radial prefactor
+      vanish at the nucleus and cannot carry the cusp.  CASINO's
+      ``cusp_correction`` makes the same choice.
 
       :returns: Array of fixed AO indices, one per centre.
       :rtype: numpy.ndarray, shape ``(num_centres,)``, dtype int
