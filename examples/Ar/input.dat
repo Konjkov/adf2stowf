@@ -1,30 +1,33 @@
 Title Ar
 
-ATOMS
- Ar        0.0000000000 0.0000000000 0.0000000000
-END
+Atoms
+ Ar        0.000000000000      0.000000000000      0.000000000000
+End
 
-CHARGE 0 0
+Charge 0 0
 
+Unrestricted
 
-
-BASIS
+Basis
   Type QZ4P
   Core None
-END
+End
+
+SCF
+  Converge 1.0e-9
+End
 
 XC
   HartreeFock
-END
+End
 
-NUMERICALQUALITY excellent
+NumericalQuality Excellent
 
-EPRINT
-  SFO NOEIG NOOVL NOORBPOP
-  SCF NOPOP
-END
+RIHartreeFock
+  UseMe True
+  FitSetQuality VeryGood
+  DependencyThreshold 1.0E-8
+End
 
-NOPRINT BAS FUNCTIONS
-
-TOTALENERGY
-NOTOTEN
+TotalEnergy
+ExactDensity

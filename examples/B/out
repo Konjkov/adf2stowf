@@ -1,7 +1,7 @@
-CASINO v2.13.1291 [Mike Towler] (4 June 2026)
+CASINO v3.1.666 (October 2026)
 Running on vladimir-kubuntu [linuxpc-gcc-parallel.openblas]
 Binary compiled in opt mode
-Job started: Чт 09 июл 2026 09:03:15 +07
+Job started: Вс 11 окт 2026 12:39:42 +07
  ------------------------------------------------------------------------------
 
                    #####
@@ -13,7 +13,7 @@ Job started: Чт 09 июл 2026 09:03:15 +07
                    #####   ##  ##   ####   ##  ##   #   ####
 
                               Quantum Monte Carlo
-                 CASINO v2.13.1291 [Mike Towler] (4 June 2026)
+                         CASINO v3.1.629 (October 2026)
 
     Main Authors : R.J. Needs, M.D. Towler, N.D. Drummond, and P. Lopez Rios
 
@@ -27,7 +27,7 @@ Job started: Чт 09 июл 2026 09:03:15 +07
                       Current contact: mdt26 at cantab.net
 
  ------------------------------------------------------------------------------
- Started 2026/07/09 09:03:16.160
+ Started 2026/10/11 12:39:43.219
 
  Running in parallel using 4 MPI processes.
 
@@ -50,6 +50,7 @@ Job started: Чт 09 июл 2026 09:03:15 +07
  NON_LOCAL_GRID (NL integration grid)     :  4
  E_OFFSET (energy offset)                 :  0.0000
  ESUPERCELL                               :  F
+ STOTOL  (STO evaluation tolerance)       :  10.0
  SPARSE                                   :  F
  DIPOLE_MOMENT                            :  F
  CHECKPOINT (checkpointing level)         :  1
@@ -63,11 +64,12 @@ Job started: Чт 09 июл 2026 09:03:15 +07
  VMC_METHOD (choice of VMC algorithm)     :  1
  DTVMC (VMC time step)                    :  1.0000E-01
  OPT_DTVMC (VMC time-step optimization)   :  1
+ VMC_STEP_PROFILE (pos.-dependent step)   :  T
  VMC_NSTEP (num VMC steps)                :  1000000000
  VMC_NCONFIG_WRITE (num configs to write) :  0
  VMC_NBLOCK (num VMC blocks)              :  10
  VMC_EQUIL_NSTEP (num equil steps)        :  5000
- VMC_DECORR_PERIOD (length of inner loop) :  1
+ VMC_DECORR_PERIOD (length of inner loop) :  3
  VMC_AVE_PERIOD (hist reduction factor)   :  1
  VMC_SAMPLING                             :  standard
  MAKEMOVIE                                :  F
@@ -101,7 +103,7 @@ Job started: Чт 09 июл 2026 09:03:15 +07
  Generator                                 :  RANLUX
  RANLUX luxury level                       :  3
  p value                                   :  223
- Value of random seed on MPI process 0     :  1858370736
+ Value of random seed on MPI process 0     :  289012433
 
  Initialized with seed derived from timer.
 
@@ -153,6 +155,20 @@ Job started: Чт 09 июл 2026 09:03:15 +07
 
  STO data setup
  ==============
+ Warning : [STOWFDET_CUSP_CHECK] Cusp constraint for centre=1, molorb=1,spin=1
+ violated by 1.6785E-01
+
+ Warning : [STOWFDET_CUSP_CHECK] Cusp constraint for centre=1, molorb=2,spin=1
+ violated by 8.5292E-02
+
+ Warning : [STOWFDET_CUSP_CHECK] Cusp constraint for centre=1, molorb=1,spin=2
+ violated by 1.6886E-01
+
+ Warning : [STOWFDET_CUSP_CHECK] Cusp constraint for centre=1, molorb=2,spin=2
+ violated by 8.4523E-02
+
+ Orbital overlap check: max|S/c-I| 2.7E-14 occupied, 2.7E-14 all, tol 1.0E-04
+
  STO data setup complete.
 
  Expectation values
@@ -167,7 +183,7 @@ Job started: Чт 09 июл 2026 09:03:15 +07
 
  Setup complete.
 
- Time taken in setup    : : :        0.0100 s
+ Time taken in setup    : : :        0.0200 s
 
  ====================================
  PERFORMING A SINGLE VMC CALCULATION.
@@ -179,8 +195,8 @@ Job started: Чт 09 июл 2026 09:03:15 +07
 
  Running VMC equilibration (5000 moves).
   Performing time-step optimization.
-  DTVMC #1:   2.3054E-01 (optimized)
-  DTVMC #2:   1.2195E-01 (optimized)
+  DTVMC #1:   1.0038E+00 (optimized)
+  DTVMC #2:   9.3916E-01 (optimized)
  Done. [total CPU time: 0s]
 
  Kinetic energy check performed.
@@ -192,453 +208,453 @@ Job started: Чт 09 июл 2026 09:03:15 +07
  =========================================================================
  In block : 1
 
- Acceptance ratio #1         (%)  =  49.8809
- Acceptance ratio #2         (%)  =  51.3322
- Diffusion constant #1  (Bohr^2)  = 7.1119E-02
- Diffusion constant #2  (Bohr^2)  = 3.9418E-02
- Correlation time        (steps)  = 1.2238E+01 +- 1.4952E-02
- Efficiency         (au^-2 s^-1)  = 4.5023E+03
+ Acceptance ratio #1         (%)  =  50.1112
+ Acceptance ratio #2         (%)  =  50.9219
+ Diffusion constant #1  (Bohr^2)  = 4.4927E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8413E-01
+ Correlation time        (steps)  = 1.6190E+00 +- 7.5940E-04
+ Efficiency         (au^-2 s^-1)  = 1.6329E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.533187962158
-  Standard error                        +/-           0.000222251355
+  Total energy                       (au) =         -24.533447082196
+  Standard error                        +/-           0.000221890834
 
-  Kinetic energy KEI (used in Total) (au) =          24.506664532715
-  Standard error                        +/-           0.003362484330
+  Kinetic energy KEI (used in Total) (au) =          24.437931941318
+  Standard error                        +/-           0.003301064130
 
-  Kinetic energy TI                  (au) =          24.495688315321
-  Standard error                        +/-           0.033826848124
+  Kinetic energy TI                  (au) =          24.436011779583
+  Standard error                        +/-           0.002739984623
 
-  Kinetic energy FISQ                (au) =          24.484712097926
-  Standard error                        +/-           0.067568737323
+  Kinetic energy FISQ                (au) =          24.434091617853
+  Standard error                        +/-           0.004351355231
 
-  Potential energy                   (au) =         -49.039852494871
-  Standard error                        +/-           0.003380148049
+  Potential energy                   (au) =         -48.971379023512
+  Standard error                        +/-           0.003318338686
 
-  e-e interaction                    (au) =           7.830818858352
-  Standard error                        +/-           0.000295220859
+  e-e interaction                    (au) =           7.830151627090
+  Standard error                        +/-           0.000294993540
 
-  e-n interaction                    (au) =         -56.870671353229
-  Standard error                        +/-           0.003468758297
+  e-n interaction                    (au) =         -56.801530650600
+  Standard error                        +/-           0.003408098456
 
-  Variance of local energy           (au) =           4.938419174192
-  Standard error                        +/-           0.024453271465
+  Variance of local energy           (au) =           4.923094598468
+  Standard error                        +/-           0.021671057411
 
-  Maximum distance from origin       (au) =          15.246398828075
+  Maximum distance from origin       (au) =          23.977360592034
 
 
- Time taken in block    : : :      367.4900 s
+ Time taken in block    : : :      768.3400 s
 
 
  =========================================================================
  In block : 2
 
- Acceptance ratio #1         (%)  =  49.8791
- Acceptance ratio #2         (%)  =  51.3385
- Diffusion constant #1  (Bohr^2)  = 7.1112E-02
- Diffusion constant #2  (Bohr^2)  = 3.9434E-02
- Correlation time        (steps)  = 1.3099E+01 +- 1.6953E-02
- Efficiency         (au^-2 s^-1)  = 4.0172E+03
+ Acceptance ratio #1         (%)  =  50.1136
+ Acceptance ratio #2         (%)  =  50.9235
+ Diffusion constant #1  (Bohr^2)  = 4.4929E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8416E-01
+ Correlation time        (steps)  = 1.6157E+00 +- 7.5788E-04
+ Efficiency         (au^-2 s^-1)  = 1.7033E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.532289690750
-  Standard error                        +/-           0.000225783973
+  Total energy                       (au) =         -24.532925156669
+  Standard error                        +/-           0.000223230147
 
-  Kinetic energy KEI (used in Total) (au) =          24.461873806112
-  Standard error                        +/-           0.003324621449
+  Kinetic energy KEI (used in Total) (au) =          24.434083834229
+  Standard error                        +/-           0.003289426269
 
-  Kinetic energy TI                  (au) =          24.445627850797
-  Standard error                        +/-           0.005124115757
+  Kinetic energy TI                  (au) =          24.432552439815
+  Standard error                        +/-           0.002507562715
 
-  Kinetic energy FISQ                (au) =          24.429381895484
-  Standard error                        +/-           0.009683855726
+  Kinetic energy FISQ                (au) =          24.431021045408
+  Standard error                        +/-           0.003757613730
 
-  Potential energy                   (au) =         -48.994163496854
-  Standard error                        +/-           0.003342275305
+  Potential energy                   (au) =         -48.967008990894
+  Standard error                        +/-           0.003306814163
 
-  e-e interaction                    (au) =           7.830018418992
-  Standard error                        +/-           0.000297848101
+  e-e interaction                    (au) =           7.829956890319
+  Standard error                        +/-           0.000295946070
 
-  e-n interaction                    (au) =         -56.824181915852
-  Standard error                        +/-           0.003431506188
+  e-n interaction                    (au) =         -56.796965881212
+  Standard error                        +/-           0.003396902124
 
-  Variance of local energy           (au) =           5.098319994019
-  Standard error                        +/-           0.030728064092
+  Variance of local energy           (au) =           4.983739724233
+  Standard error                        +/-           0.023838867531
 
-  Maximum distance from origin       (au) =          14.485316950897
+  Maximum distance from origin       (au) =          16.133669387438
 
 
- Time taken in block    : : :      372.7299 s
+ Time taken in block    : : :      729.0900 s
 
 
  =========================================================================
  In block : 3
 
- Acceptance ratio #1         (%)  =  49.8892
- Acceptance ratio #2         (%)  =  51.3383
- Diffusion constant #1  (Bohr^2)  = 7.1126E-02
- Diffusion constant #2  (Bohr^2)  = 3.9442E-02
- Correlation time        (steps)  = 1.2226E+01 +- 1.4926E-02
- Efficiency         (au^-2 s^-1)  = 4.4871E+03
+ Acceptance ratio #1         (%)  =  50.1120
+ Acceptance ratio #2         (%)  =  50.9238
+ Diffusion constant #1  (Bohr^2)  = 4.4930E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8416E-01
+ Correlation time        (steps)  = 1.6070E+00 +- 7.5376E-04
+ Efficiency         (au^-2 s^-1)  = 1.7278E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.531971929987
-  Standard error                        +/-           0.000222868801
+  Total energy                       (au) =         -24.533024085276
+  Standard error                        +/-           0.000222310887
 
-  Kinetic energy KEI (used in Total) (au) =          24.451889150883
-  Standard error                        +/-           0.003333513119
+  Kinetic energy KEI (used in Total) (au) =          24.437289962095
+  Standard error                        +/-           0.003307472250
 
-  Kinetic energy TI                  (au) =          24.436202575646
-  Standard error                        +/-           0.002846433091
+  Kinetic energy TI                  (au) =          24.433429407321
+  Standard error                        +/-           0.002663959638
 
-  Kinetic energy FISQ                (au) =          24.420516000406
-  Standard error                        +/-           0.004592485945
+  Kinetic energy FISQ                (au) =          24.429568852549
+  Standard error                        +/-           0.004152492144
 
-  Potential energy                   (au) =         -48.983861080873
-  Standard error                        +/-           0.003350913386
+  Potential energy                   (au) =         -48.970314047371
+  Standard error                        +/-           0.003324702540
 
-  e-e interaction                    (au) =           7.829781230205
-  Standard error                        +/-           0.000295659347
+  e-e interaction                    (au) =           7.830427642738
+  Standard error                        +/-           0.000295253228
 
-  e-n interaction                    (au) =         -56.813642311095
-  Standard error                        +/-           0.003440184021
+  e-n interaction                    (au) =         -56.800741690108
+  Standard error                        +/-           0.003414232349
 
-  Variance of local energy           (au) =           4.965916910677
-  Standard error                        +/-           0.023406187744
+  Variance of local energy           (au) =           4.942978837652
+  Standard error                        +/-           0.036083089651
 
-  Maximum distance from origin       (au) =          14.600633260680
+  Maximum distance from origin       (au) =          15.981248123667
 
 
- Time taken in block    : : :      367.0701 s
+ Time taken in block    : : :      728.6300 s
 
 
  =========================================================================
  In block : 4
 
- Acceptance ratio #1         (%)  =  49.8832
- Acceptance ratio #2         (%)  =  51.3387
- Diffusion constant #1  (Bohr^2)  = 7.1120E-02
- Diffusion constant #2  (Bohr^2)  = 3.9429E-02
- Correlation time        (steps)  = 1.2475E+01 +- 1.5352E-02
- Efficiency         (au^-2 s^-1)  = 4.3807E+03
+ Acceptance ratio #1         (%)  =  50.1117
+ Acceptance ratio #2         (%)  =  50.9244
+ Diffusion constant #1  (Bohr^2)  = 4.4926E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8417E-01
+ Correlation time        (steps)  = 1.6192E+00 +- 7.5951E-04
+ Efficiency         (au^-2 s^-1)  = 1.6789E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.534613743514
-  Standard error                        +/-           0.000223245552
+  Total energy                       (au) =         -24.532604936669
+  Standard error                        +/-           0.000224009153
 
-  Kinetic energy KEI (used in Total) (au) =          24.416660813411
-  Standard error                        +/-           0.003377880805
+  Kinetic energy KEI (used in Total) (au) =          24.446749787411
+  Standard error                        +/-           0.003305837562
 
-  Kinetic energy TI                  (au) =          24.418843268828
-  Standard error                        +/-           0.002975361488
+  Kinetic energy TI                  (au) =          24.437707721144
+  Standard error                        +/-           0.002677681972
 
-  Kinetic energy FISQ                (au) =          24.421025724255
-  Standard error                        +/-           0.004877390918
+  Kinetic energy FISQ                (au) =          24.428665654874
+  Standard error                        +/-           0.004187864596
 
-  Potential energy                   (au) =         -48.951274556919
-  Standard error                        +/-           0.003395587873
+  Potential energy                   (au) =         -48.979354724077
+  Standard error                        +/-           0.003323065427
 
-  e-e interaction                    (au) =           7.827483301739
-  Standard error                        +/-           0.000295920849
+  e-e interaction                    (au) =           7.831442866152
+  Standard error                        +/-           0.000296613082
 
-  e-n interaction                    (au) =         -56.778757858661
-  Standard error                        +/-           0.003482969530
+  e-n interaction                    (au) =         -56.810797590232
+  Standard error                        +/-           0.003412874492
 
-  Variance of local energy           (au) =           4.979468687754
-  Standard error                        +/-           0.026916975503
+  Variance of local energy           (au) =           5.018020368367
+  Standard error                        +/-           0.041723743441
 
-  Maximum distance from origin       (au) =          16.664831044874
+  Maximum distance from origin       (au) =          18.501236436152
 
 
- Time taken in block    : : :      367.4900 s
+ Time taken in block    : : :      733.0400 s
 
 
  =========================================================================
  In block : 5
 
- Acceptance ratio #1         (%)  =  49.8833
- Acceptance ratio #2         (%)  =  51.3434
- Diffusion constant #1  (Bohr^2)  = 7.1104E-02
- Diffusion constant #2  (Bohr^2)  = 3.9453E-02
- Correlation time        (steps)  = 1.2587E+01 +- 1.5826E-02
- Efficiency         (au^-2 s^-1)  = 4.1639E+03
+ Acceptance ratio #1         (%)  =  50.1117
+ Acceptance ratio #2         (%)  =  50.9252
+ Diffusion constant #1  (Bohr^2)  = 4.4928E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8417E-01
+ Correlation time        (steps)  = 1.6156E+00 +- 7.5789E-04
+ Efficiency         (au^-2 s^-1)  = 1.7009E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.531523132807
-  Standard error                        +/-           0.000226400872
+  Total energy                       (au) =         -24.532972740785
+  Standard error                        +/-           0.000222963658
 
-  Kinetic energy KEI (used in Total) (au) =          24.445031656053
-  Standard error                        +/-           0.007343189674
+  Kinetic energy KEI (used in Total) (au) =          24.453356759509
+  Standard error                        +/-           0.003294600224
 
-  Kinetic energy TI                  (au) =          24.430937384152
-  Standard error                        +/-           0.004112251062
+  Kinetic energy TI                  (au) =          24.442970418597
+  Standard error                        +/-           0.002677410240
 
-  Kinetic energy FISQ                (au) =          24.416843112249
-  Standard error                        +/-           0.003675883644
+  Kinetic energy FISQ                (au) =          24.432584077681
+  Standard error                        +/-           0.004196314103
 
-  Potential energy                   (au) =         -48.976554788868
-  Standard error                        +/-           0.007351210881
+  Potential energy                   (au) =         -48.986329500294
+  Standard error                        +/-           0.003311792517
 
-  e-e interaction                    (au) =           7.829595225700
-  Standard error                        +/-           0.000298318306
+  e-e interaction                    (au) =           7.830437990597
+  Standard error                        +/-           0.000295860686
 
-  e-n interaction                    (au) =         -56.806150014565
-  Standard error                        +/-           0.007392035827
+  e-n interaction                    (au) =         -56.816767490889
+  Standard error                        +/-           0.003402039665
 
-  Variance of local energy           (au) =           5.125250076545
-  Standard error                        +/-           0.076357052193
+  Variance of local energy           (au) =           4.973457858795
+  Standard error                        +/-           0.040406211664
 
-  Maximum distance from origin       (au) =          16.550580936100
+  Maximum distance from origin       (au) =          18.666898499546
 
 
- Time taken in block    : : :      372.2600 s
+ Time taken in block    : : :      731.6899 s
 
 
  =========================================================================
  In block : 6
 
- Acceptance ratio #1         (%)  =  49.8904
- Acceptance ratio #2         (%)  =  51.3392
- Diffusion constant #1  (Bohr^2)  = 7.1122E-02
- Diffusion constant #2  (Bohr^2)  = 3.9441E-02
- Correlation time        (steps)  = 1.2039E+01 +- 1.4552E-02
- Efficiency         (au^-2 s^-1)  = 3.9295E+03
+ Acceptance ratio #1         (%)  =  50.1131
+ Acceptance ratio #2         (%)  =  50.9233
+ Diffusion constant #1  (Bohr^2)  = 4.4926E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8415E-01
+ Correlation time        (steps)  = 1.6087E+00 +- 7.5456E-04
+ Efficiency         (au^-2 s^-1)  = 1.7048E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.533397784237
-  Standard error                        +/-           0.000221881592
+  Total energy                       (au) =         -24.533140291662
+  Standard error                        +/-           0.000223193640
 
-  Kinetic energy KEI (used in Total) (au) =          24.438500461900
-  Standard error                        +/-           0.003298168041
+  Kinetic energy KEI (used in Total) (au) =          24.440401174934
+  Standard error                        +/-           0.003310110948
 
-  Kinetic energy TI                  (au) =          24.428914330825
-  Standard error                        +/-           0.003350138169
+  Kinetic energy TI                  (au) =          24.435024401020
+  Standard error                        +/-           0.002879413150
 
-  Kinetic energy FISQ                (au) =          24.419328199753
-  Standard error                        +/-           0.005814664694
+  Kinetic energy FISQ                (au) =          24.429647627100
+  Standard error                        +/-           0.004689952350
 
-  Potential energy                   (au) =         -48.971898246140
-  Standard error                        +/-           0.003316057025
+  Potential energy                   (au) =         -48.973541466597
+  Standard error                        +/-           0.003327375960
 
-  e-e interaction                    (au) =           7.828207610258
-  Standard error                        +/-           0.000294914371
+  e-e interaction                    (au) =           7.830596103007
+  Standard error                        +/-           0.000295901824
 
-  e-n interaction                    (au) =         -56.800105856398
-  Standard error                        +/-           0.003405597821
+  e-n interaction                    (au) =         -56.804137569606
+  Standard error                        +/-           0.003416911307
 
-  Variance of local energy           (au) =           4.922080818162
-  Standard error                        +/-           0.029070663334
+  Variance of local energy           (au) =           4.981397346201
+  Standard error                        +/-           0.028041949505
 
-  Maximum distance from origin       (au) =          14.428964883872
+  Maximum distance from origin       (au) =          16.037280480878
 
 
- Time taken in block    : : :      429.4601 s
+ Time taken in block    : : :      732.0000 s
 
 
  =========================================================================
  In block : 7
 
- Acceptance ratio #1         (%)  =  49.8871
- Acceptance ratio #2         (%)  =  51.3410
- Diffusion constant #1  (Bohr^2)  = 7.1106E-02
- Diffusion constant #2  (Bohr^2)  = 3.9435E-02
- Correlation time        (steps)  = 1.1826E+01 +- 1.4194E-02
- Efficiency         (au^-2 s^-1)  = 3.9510E+03
+ Acceptance ratio #1         (%)  =  50.1145
+ Acceptance ratio #2         (%)  =  50.9224
+ Diffusion constant #1  (Bohr^2)  = 4.4930E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8420E-01
+ Correlation time        (steps)  = 1.6061E+00 +- 7.5333E-04
+ Efficiency         (au^-2 s^-1)  = 1.7126E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.534048715538
-  Standard error                        +/-           0.000222015433
+  Total energy                       (au) =         -24.533112978955
+  Standard error                        +/-           0.000223155582
 
-  Kinetic energy KEI (used in Total) (au) =          24.424847000469
-  Standard error                        +/-           0.003581853444
+  Kinetic energy KEI (used in Total) (au) =          24.436748860661
+  Standard error                        +/-           0.003318622432
 
-  Kinetic energy TI                  (au) =          24.420994186252
-  Standard error                        +/-           0.002493969409
+  Kinetic energy TI                  (au) =          24.440379431483
+  Standard error                        +/-           0.003934190660
 
-  Kinetic energy FISQ                (au) =          24.417141372034
-  Standard error                        +/-           0.003442657385
+  Kinetic energy FISQ                (au) =          24.444010002305
+  Standard error                        +/-           0.007119976260
 
-  Potential energy                   (au) =         -48.958895716002
-  Standard error                        +/-           0.003598828958
+  Potential energy                   (au) =         -48.969861839617
+  Standard error                        +/-           0.003335818854
 
-  e-e interaction                    (au) =           7.826466656584
-  Standard error                        +/-           0.000294543486
+  e-e interaction                    (au) =           7.829679754430
+  Standard error                        +/-           0.000295986306
 
-  e-n interaction                    (au) =         -56.785362372590
-  Standard error                        +/-           0.003680861545
+  e-n interaction                    (au) =         -56.799541594040
+  Standard error                        +/-           0.003425124072
 
-  Variance of local energy           (au) =           4.929440795032
-  Standard error                        +/-           0.029724741219
+  Variance of local energy           (au) =           4.979990367630
+  Standard error                        +/-           0.034587198579
 
-  Maximum distance from origin       (au) =          14.289157269115
+  Maximum distance from origin       (au) =          16.498463021696
 
 
- Time taken in block    : : :      434.1599 s
+ Time taken in block    : : :      730.0400 s
 
 
  =========================================================================
  In block : 8
 
- Acceptance ratio #1         (%)  =  49.8846
- Acceptance ratio #2         (%)  =  51.3426
- Diffusion constant #1  (Bohr^2)  = 7.1100E-02
- Diffusion constant #2  (Bohr^2)  = 3.9433E-02
- Correlation time        (steps)  = 1.1837E+01 +- 1.4213E-02
- Efficiency         (au^-2 s^-1)  = 4.4374E+03
+ Acceptance ratio #1         (%)  =  50.1125
+ Acceptance ratio #2         (%)  =  50.9275
+ Diffusion constant #1  (Bohr^2)  = 4.4931E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8416E-01
+ Correlation time        (steps)  = 1.6155E+00 +- 7.5782E-04
+ Efficiency         (au^-2 s^-1)  = 1.5432E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.534909010942
-  Standard error                        +/-           0.000221329832
+  Total energy                       (au) =         -24.532758548756
+  Standard error                        +/-           0.000223841549
 
-  Kinetic energy KEI (used in Total) (au) =          24.380962523885
-  Standard error                        +/-           0.003261377995
+  Kinetic energy KEI (used in Total) (au) =          24.431603064567
+  Standard error                        +/-           0.003340642933
 
-  Kinetic energy TI                  (au) =          24.401038760363
-  Standard error                        +/-           0.002981144511
+  Kinetic energy TI                  (au) =          24.437529182927
+  Standard error                        +/-           0.004823566436
 
-  Kinetic energy FISQ                (au) =          24.421114996840
-  Standard error                        +/-           0.004969211068
+  Kinetic energy FISQ                (au) =          24.443455301284
+  Standard error                        +/-           0.009039018324
 
-  Potential energy                   (au) =         -48.915871534828
-  Standard error                        +/-           0.003279721014
+  Potential energy                   (au) =         -48.964361613323
+  Standard error                        +/-           0.003357838810
 
-  e-e interaction                    (au) =           7.824871294708
-  Standard error                        +/-           0.000294196798
+  e-e interaction                    (au) =           7.830601893284
+  Standard error                        +/-           0.000296507087
 
-  e-n interaction                    (au) =         -56.740742829541
-  Standard error                        +/-           0.003370032445
+  e-n interaction                    (au) =         -56.794963506599
+  Standard error                        +/-           0.003446467069
 
-  Variance of local energy           (au) =           4.898188793016
-  Standard error                        +/-           0.035049499238
+  Variance of local energy           (au) =           5.009808132477
+  Standard error                        +/-           0.041579815760
 
-  Maximum distance from origin       (au) =          13.720345721908
+  Maximum distance from origin       (au) =          16.609716406321
 
 
- Time taken in block    : : :      388.6899 s
+ Time taken in block    : : :      800.6597 s
 
 
  =========================================================================
  In block : 9
 
- Acceptance ratio #1         (%)  =  49.8833
- Acceptance ratio #2         (%)  =  51.3392
- Diffusion constant #1  (Bohr^2)  = 7.1081E-02
- Diffusion constant #2  (Bohr^2)  = 3.9438E-02
- Correlation time        (steps)  = 1.2229E+01 +- 1.4939E-02
- Efficiency         (au^-2 s^-1)  = 3.7845E+03
+ Acceptance ratio #1         (%)  =  50.1090
+ Acceptance ratio #2         (%)  =  50.9243
+ Diffusion constant #1  (Bohr^2)  = 4.4927E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8414E-01
+ Correlation time        (steps)  = 1.6083E+00 +- 7.5438E-04
+ Efficiency         (au^-2 s^-1)  = 1.4607E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.533993402496
-  Standard error                        +/-           0.000221965315
+  Total energy                       (au) =         -24.532503250766
+  Standard error                        +/-           0.000222980494
 
-  Kinetic energy KEI (used in Total) (au) =          24.422878339615
-  Standard error                        +/-           0.003276334697
+  Kinetic energy KEI (used in Total) (au) =          24.432508644960
+  Standard error                        +/-           0.003337178545
 
-  Kinetic energy TI                  (au) =          24.423209845744
-  Standard error                        +/-           0.003888347112
+  Kinetic energy TI                  (au) =          24.439942370222
+  Standard error                        +/-           0.004346074082
 
-  Kinetic energy FISQ                (au) =          24.423541351871
-  Standard error                        +/-           0.007037477420
+  Kinetic energy FISQ                (au) =          24.447376095487
+  Standard error                        +/-           0.008013925297
 
-  Potential energy                   (au) =         -48.956871742117
-  Standard error                        +/-           0.003293987241
+  Potential energy                   (au) =         -48.965011895728
+  Standard error                        +/-           0.003354239656
 
-  e-e interaction                    (au) =           7.826932673493
-  Standard error                        +/-           0.000294902792
+  e-e interaction                    (au) =           7.831031292930
+  Standard error                        +/-           0.000295950692
 
-  e-n interaction                    (au) =         -56.783804415611
-  Standard error                        +/-           0.003384315652
+  e-n interaction                    (au) =         -56.796043188656
+  Standard error                        +/-           0.003443103367
 
-  Variance of local energy           (au) =           4.926427158070
-  Standard error                        +/-           0.033466939150
+  Variance of local energy           (au) =           4.972181547680
+  Standard error                        +/-           0.024505812905
 
-  Maximum distance from origin       (au) =          15.917685745384
+  Maximum distance from origin       (au) =          16.450686635834
 
 
- Time taken in block    : : :      438.5901 s
+ Time taken in block    : : :      856.1001 s
 
 
  =========================================================================
  In block : 10
 
- Acceptance ratio #1         (%)  =  49.8866
- Acceptance ratio #2         (%)  =  51.3382
- Diffusion constant #1  (Bohr^2)  = 7.1113E-02
- Diffusion constant #2  (Bohr^2)  = 3.9445E-02
- Correlation time        (steps)  = 1.2379E+01 +- 1.5298E-02
- Efficiency         (au^-2 s^-1)  = 4.1571E+03
+ Acceptance ratio #1         (%)  =  50.1140
+ Acceptance ratio #2         (%)  =  50.9236
+ Diffusion constant #1  (Bohr^2)  = 4.4930E-01
+ Diffusion constant #2  (Bohr^2)  = 3.8419E-01
+ Correlation time        (steps)  = 1.5960E+00 +- 7.4861E-04
+ Efficiency         (au^-2 s^-1)  = 1.5053E+04
  No. of VMC steps per MPI process = 25000000
 
   Block average energies (au)
 
-  Total energy                       (au) =         -24.533422214368
-  Standard error                        +/-           0.000221179241
+  Total energy                       (au) =         -24.533065444617
+  Standard error                        +/-           0.000223579334
 
-  Kinetic energy KEI (used in Total) (au) =          24.461733033350
-  Standard error                        +/-           0.003748594940
+  Kinetic energy KEI (used in Total) (au) =          24.439530594617
+  Standard error                        +/-           0.003313723289
 
-  Kinetic energy TI                  (au) =          24.444775147094
-  Standard error                        +/-           0.003814931348
+  Kinetic energy TI                  (au) =          24.436551235830
+  Standard error                        +/-           0.002776306255
 
-  Kinetic energy FISQ                (au) =          24.427817260844
-  Standard error                        +/-           0.006630265707
+  Kinetic energy FISQ                (au) =          24.433571877046
+  Standard error                        +/-           0.004432510113
 
-  Potential energy                   (au) =         -48.995155247713
-  Standard error                        +/-           0.003764183706
+  Potential energy                   (au) =         -48.972596039232
+  Standard error                        +/-           0.003330943087
 
-  e-e interaction                    (au) =           7.828005539635
-  Standard error                        +/-           0.000294455276
+  e-e interaction                    (au) =           7.829697636238
+  Standard error                        +/-           0.000296281403
 
-  e-n interaction                    (au) =         -56.823160787350
-  Standard error                        +/-           0.003843839097
+  e-n interaction                    (au) =         -56.802293675468
+  Standard error                        +/-           0.003420458620
 
-  Variance of local energy           (au) =           4.895354195587
-  Standard error                        +/-           0.020748714412
+  Variance of local energy           (au) =           5.001553827003
+  Standard error                        +/-           0.032425988763
 
-  Maximum distance from origin       (au) =          16.352044114957
+  Maximum distance from origin       (au) =          15.571246258560
 
 
- Time taken in block    : : :      396.9700 s
+ Time taken in block    : : :      832.2300 s
 
  =========================================================================
  FINAL RESULT:
 
   VMC energy (au)    Standard error      Correction for serial correlation
 
- -24.533335758680 +/- 0.000070486783      No correction
- -24.533335758680 +/- 0.000247142352      Correlation time method
- -24.533335758670 +/- 0.000252904813      On-the-fly reblocking method
+ -24.532955451635 +/- 0.000070555591      No correction
+ -24.532955451635 +/- 0.000089556441      Correlation time method
+ -24.532955451633 +/- 0.000089519612      On-the-fly reblocking method
 
-  Sample variance of E_L (au^2/sim.cell) : 4.967886660305 +- 0.025428845503
+  Sample variance of E_L (au^2/sim.cell) : 4.978622260851 +- 0.009133768955
 
  =========================================================================
 
 
- Total CASINO CPU time  : : :     3935.3298 s
- Total CASINO real time : : :     4006.5171 s
+ Total CASINO CPU time  : : :     7642.4800 s
+ Total CASINO real time : : :     7688.4111 s
 
 
  Subroutine timers deactivated (use TIMING_INFO input keyword)
 
  =========================================================================
- Ends 2026/07/09 10:10:02.677
+ Ends 2026/10/11 14:47:51.630
 
-Job finished: Чт 09 июл 2026 10:10:02 +07
+Job finished: Вс 11 окт 2026 14:47:51 +07

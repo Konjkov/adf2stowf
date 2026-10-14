@@ -1,37 +1,34 @@
-Title HCN
+Title CN-
 
-ATOMS
+Atoms
  C         0.000000000000      0.000000000000      0.000000000000
  N         0.000000000000      0.000000000000      1.171800000000
-END
+End
 
-CHARGE -1 0
+Charge -1 0
 
+Unrestricted
 
-
-BASIS
+Basis
   Type QZ4P
   Core None
-END
+End
+
+SCF
+  Converge 1.0e-9
+End
 
 XC
   HartreeFock
-END
+End
+
+NumericalQuality Excellent
 
 RIHartreeFock
   UseMe True
-  Quality Excellent
+  FitSetQuality VeryGood
   DependencyThreshold 1.0E-8
 End
 
-NUMERICALQUALITY excellent
-
-EPRINT
-  SFO NOEIG NOOVL NOORBPOP
-  SCF NOPOP
-END
-
-NOPRINT BAS FUNCTIONS
-
-TOTALENERGY
-NOTOTEN
+TotalEnergy
+ExactDensity

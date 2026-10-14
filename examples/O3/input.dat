@@ -1,32 +1,35 @@
 Title O3
 
-ATOMS
+Atoms
  O         0.000000000000      0.000000000000      0.000000000000
  O         0.000000000000      0.000000000000      1.268813890000
  O         1.129329809229      0.000000000000     -0.578362230305
-END
+End
 
-CHARGE 0 0
+Charge 0 0
 
+Unrestricted
 
-
-BASIS
+Basis
   Type QZ4P
   Core None
-END
+End
+
+SCF
+  Converge 1.0e-9
+End
 
 XC
   HartreeFock
-END
+End
 
-NUMERICALQUALITY excellent
+NumericalQuality Excellent
 
-EPRINT
-  SFO NOEIG NOOVL NOORBPOP
-  SCF NOPOP
-END
+RIHartreeFock
+  UseMe True
+  FitSetQuality VeryGood
+  DependencyThreshold 1.0E-8
+End
 
-NOPRINT BAS FUNCTIONS
-
-TOTALENERGY
-NOTOTEN
+TotalEnergy
+ExactDensity

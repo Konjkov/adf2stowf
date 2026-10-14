@@ -2,41 +2,38 @@ Title C
 
 Symmetry NOSYM
 
-ATOMS
+Atoms
  C         0.000000000000      0.000000000000      0.000000000000
-END
+End
 
-CHARGE 0 2
+Charge 0 2
 
-UNRESTRICTED
+Unrestricted
 
 IrrepOccupations
   A 4 // 2
 End
 
-BASIS
+Basis
   Type QZ4P
   Core None
-END
-
-RIHartreeFock
-  UseMe True
-  Quality Excellent
-  DependencyThreshold 1.0E-8
 End
 
-NUMERICALQUALITY excellent
+SCF
+  Converge 1.0e-9
+End
 
 XC
   HartreeFock
-END
+End
 
-EPRINT
-  SFO NOEIG NOOVL NOORBPOP
-  SCF NOPOP
-END
+NumericalQuality Excellent
 
-NOPRINT BAS FUNCTIONS
+RIHartreeFock
+  UseMe True
+  FitSetQuality VeryGood
+  DependencyThreshold 1.0E-8
+End
 
-TOTALENERGY
-NOTOTEN
+TotalEnergy
+ExactDensity

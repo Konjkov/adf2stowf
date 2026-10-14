@@ -2,35 +2,38 @@ Title Ga
 
 Symmetry NOSYM
 
-ATOMS
+Atoms
  Ga        0.000000000000      0.000000000000      0.000000000000
-END
+End
 
-CHARGE 0 1
+Charge 0 1
 
-UNRESTRICTED
-
-BASIS
-  Type QZ4P
-  Core None
-END
-
-NUMERICALQUALITY excellent
+Unrestricted
 
 IrrepOccupations
   A 16 // 15
 End
 
+Basis
+  Type QZ4P
+  Core None
+End
+
+SCF
+  Converge 1.0e-9
+End
+
 XC
   HartreeFock
-END
+End
 
-EPRINT
-  SFO NOEIG NOOVL NOORBPOP
-  SCF NOPOP
-END
+NumericalQuality Excellent
 
-NOPRINT BAS FUNCTIONS
+RIHartreeFock
+  UseMe True
+  FitSetQuality VeryGood
+  DependencyThreshold 1.0E-8
+End
 
-TOTALENERGY
-NOTOTEN
+TotalEnergy
+ExactDensity
